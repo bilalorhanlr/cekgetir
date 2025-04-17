@@ -9,12 +9,12 @@ export function middleware(request) {
 
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com/recaptcha/ https://www.gstatic.com/ https://*.googleapis.com https://maps.googleapis.com",
-    "style-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://*.googleapis.com",
-    "img-src 'self' data: blob: https://www.google.com/recaptcha/ https://*.googleapis.com https://*.gstatic.com",
-    "font-src 'self' https://*.gstatic.com",
-    `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL} https://www.google.com/recaptcha/ https://*.googleapis.com https://maps.googleapis.com`,
-    "frame-src 'self' https://www.google.com/recaptcha/",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com/recaptcha/ https://www.gstatic.com/ https://*.googleapis.com https://maps.googleapis.com https://maps.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://*.googleapis.com https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https://www.google.com/recaptcha/ https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://maps.googleapis.com",
+    "font-src 'self' https://*.gstatic.com https://fonts.googleapis.com",
+    `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL} https://www.google.com/recaptcha/ https://*.googleapis.com https://maps.googleapis.com https://maps.gstatic.com`,
+    "frame-src 'self' https://www.google.com/recaptcha/ https://*.googleapis.com",
     "worker-src 'self' blob:"
   ]
 

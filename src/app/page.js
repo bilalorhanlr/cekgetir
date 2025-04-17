@@ -5,6 +5,7 @@ import Footer from '@/components/Footer'
 import Image from 'next/image'
 import { useEffect, useState, useRef } from 'react'
 import Script from 'next/script'
+import ContractModal from '@/components/ContractModal'
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -27,17 +28,38 @@ export default function Home() {
     vehicleModel: '',
     vehicleYear: '',
     vehicleType: '',
-    vehicleTransmission: '',
-    vehicleFuel: '',
-    vehicleCondition: '',
     vehiclePlate: '',
+    vehicleCondition: '',
     phone: ''
   })
+
+  const [currentVehicleIndex, setCurrentVehicleIndex] = useState(0)
+  const [vehicleCount, setVehicleCount] = useState(1)
+  const [isParkingDelivery, setIsParkingDelivery] = useState(false)
+  const [multiVehicleData, setMultiVehicleData] = useState([{
+    brand: '',
+    model: '',
+    year: '',
+    type: '',
+    plate: '',
+    condition: '',
+    phone: ''
+  }])
 
   const fromInputRef = useRef(null)
   const toInputRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
+
+  const [showPriceModal, setShowPriceModal] = useState(false)
+  const [showPrice, setShowPrice] = useState(false)
+  const [calculatedPrice, setCalculatedPrice] = useState(null)
+  const [map, setMap] = useState(null)
+  const [directionsRenderer, setDirectionsRenderer] = useState(null)
+
+  // Fiyat Modalı için harita referansı
+  const priceMapRef = useRef(null)
+  const [priceMap, setPriceMap] = useState(null)
 
   // Araç markaları ve modelleri (örnek veri)
   const vehicleData = {
@@ -67,14 +89,32 @@ export default function Home() {
     },
     types: [
       'Sedan',
+      'Cabrio',
+      'Coupe',
+      'Roadster',
       'Hatchback',
       'Station Wagon',
       'SUV',
+      'MPV',
       'Crossover',
-      'Pick-up',
       'Van',
+      'Motorsiklet'
+    ],
+    types2: [
+      'Crossover',
+      'Karavan',
+      'Pick-up',
       'Minibüs',
-      'Kamyonet'
+      'Kamyonet',
+      'Çekici',
+      'Çoklu Çekici',
+      'Dorse',
+      'İş Makinesi',
+      'Kamyon',
+      'Otobüs',
+      'Yarım Otobüs',
+      'Tanker',
+      'Romorkör',
     ],
     transmissions: ['Manuel', 'Otomatik', 'Yarı Otomatik'],
     fuels: ['Benzin', 'Dizel', 'LPG', 'Hibrit', 'Elektrik'],
@@ -86,7 +126,7 @@ export default function Home() {
     {
       id: 'yol-yardim',
       title: 'Yol Yardım',
-      description: 'Acil yol yardım hizmeti',
+      description: 'Akü takviyesi, Araç arızası',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -122,8 +162,75 @@ export default function Home() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
       )
-    }
+    },
+    /* {
+      id: 'agir-vasita',
+      title: 'Ağır Vasıta',
+      description: 'Kamyon, Tır, İş Makinesi',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+        </svg>
+      )
+    } */
   ]
+
+  const [agreements, setAgreements] = useState({
+    terms: false,
+    privacy: false,
+    payment: false
+  })
+
+  const [activeContract, setActiveContract] = useState(null)
+
+  const contracts = {
+    terms: {
+      title: "Kullanım Koşulları ve Sözleşme",
+      content: (
+        <>
+          <h2>1. Genel Hükümler</h2>
+          <p>Bu sözleşme, Çekgetir hizmetlerinin kullanım koşullarını belirler...</p>
+          <h2>2. Hizmet Kapsamı</h2>
+          <p>Çekgetir, yol yardım ve araç çekme hizmetleri sunar...</p>
+          <h2>3. Sorumluluklar</h2>
+          <p>Hizmet sağlayıcı ve kullanıcının sorumlulukları...</p>
+        </>
+      )
+    },
+    privacy: {
+      title: "KVKK ve Gizlilik Politikası",
+      content: (
+        <>
+          <h2>Kişisel Verilerin Korunması</h2>
+          <p>Kişisel verileriniz 6698 sayılı KVKK kapsamında korunmaktadır...</p>
+          <h2>Veri İşleme Amaçları</h2>
+          <p>Kişisel verileriniz aşağıdaki amaçlarla işlenmektedir...</p>
+        </>
+      )
+    },
+    payment: {
+      title: "Ödeme ve Ücretlendirme Koşulları",
+      content: (
+        <>
+          <h2>Ücretlendirme Politikası</h2>
+          <p>Hizmet ücretleri mesafe ve hizmet türüne göre belirlenir...</p>
+          <h2>Ödeme Koşulları</h2>
+          <p>Ödemeler nakit veya kredi kartı ile yapılabilir...</p>
+        </>
+      )
+    }
+  }
+
+  const handleAgreementChange = (agreement) => {
+    setAgreements(prev => ({
+      ...prev,
+      [agreement]: !prev[agreement]
+    }))
+  }
+
+  const canSubmitRequest = () => {
+    return agreements.terms && agreements.privacy && agreements.payment
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -144,8 +251,13 @@ export default function Home() {
   // Google Maps API'sini yükle
   useEffect(() => {
     const loadGoogleMaps = () => {
+      if (window.google) {
+        setIsGoogleLoaded(true)
+        return
+      }
+
       const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=tr`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,geometry&language=tr`
       script.async = true
       script.defer = true
       script.onload = () => {
@@ -154,16 +266,90 @@ export default function Home() {
       }
       script.onerror = (error) => {
         console.error('Google Maps yüklenirken hata:', error)
+        setIsGoogleLoaded(false)
       }
       document.head.appendChild(script)
     }
 
-    if (!window.google) {
-      loadGoogleMaps()
-    } else {
-      setIsGoogleLoaded(true)
-    }
+    loadGoogleMaps()
   }, [])
+
+  // Harita başlatma fonksiyonu
+  const initMap = () => {
+    if (!window.google || !mapRef.current) return
+
+    const mapInstance = new window.google.maps.Map(mapRef.current, {
+      center: { lat: 41.0082, lng: 28.9784 }, // İstanbul merkezi
+      zoom: 12,
+      mapId: 'YOUR_MAP_ID', // Opsiyonel, koyu tema için
+      styles: [
+        {
+          featureType: "all",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#ffffff" }]
+        },
+        {
+          featureType: "all",
+          elementType: "labels.text.stroke",
+          stylers: [{ color: "#000000" }]
+        },
+        {
+          featureType: "road",
+          elementType: "geometry",
+          stylers: [{ color: "#38414e" }]
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#212a37" }]
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#9ca5b3" }]
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry",
+          stylers: [{ color: "#746855" }]
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#1f2835" }]
+        },
+        {
+          featureType: "road.highway",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#f3d19c" }]
+        },
+        {
+          featureType: "water",
+          elementType: "geometry",
+          stylers: [{ color: "#17263c" }]
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#515c6d" }]
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.stroke",
+          stylers: [{ color: "#17263c" }]
+        }
+      ]
+    })
+
+    setMap(mapInstance)
+  }
+
+  // Harita yüklendiğinde başlat
+  useEffect(() => {
+    if (isGoogleLoaded && !map && mapRef.current) {
+      initMap()
+    }
+  }, [isGoogleLoaded, map])
 
   // Harita işlemleri
   useEffect(() => {
@@ -225,29 +411,75 @@ export default function Home() {
   }
 
   const getCurrentLocation = (fieldType) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const latLng = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          }
-          
-          if (markerRef.current) {
-            markerRef.current.setPosition(new window.google.maps.LatLng(latLng.lat, latLng.lng))
-          }
-          
-          setActiveLocationField(fieldType)
-          await updateLocationFromMarker(latLng)
-        },
-        (error) => {
-          console.error('Konum alınamadı:', error)
-          alert('Konumunuz alınamadı. Lütfen konum izinlerini kontrol edin.')
-        }
-      )
-    } else {
-      alert('Tarayıcınız konum özelliğini desteklemiyor.')
+    if (!isGoogleLoaded) {
+      alert('Harita yükleniyor, lütfen bekleyin...')
+      return
     }
+
+    if (!navigator.geolocation) {
+      alert('Tarayıcınız konum özelliğini desteklemiyor.')
+      return
+    }
+
+    setActiveLocationField(fieldType)
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latLng = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+        
+        try {
+          const geocoder = new window.google.maps.Geocoder()
+          const response = await geocoder.geocode({ location: latLng })
+          
+          if (response.results[0]) {
+            const locationData = {
+              address: response.results[0].formatted_address,
+              lat: latLng.lat,
+              lng: latLng.lng
+            }
+
+            setFormData(prev => ({
+              ...prev,
+              ...(fieldType === 'from' ? {
+                fromLocation: locationData.address,
+                fromLat: locationData.lat,
+                fromLng: locationData.lng
+              } : {
+                toLocation: locationData.address,
+                toLat: locationData.lat,
+                toLng: locationData.lng
+              })
+            }))
+
+            // Haritayı güncelle
+            if (mapRef.current && markerRef.current) {
+              const map = new window.google.maps.Map(mapRef.current, {
+                center: latLng,
+                zoom: 15
+              })
+              
+              markerRef.current.setMap(map)
+              markerRef.current.setPosition(latLng)
+            }
+          }
+        } catch (error) {
+          console.error('Geocoding hatası:', error)
+          alert('Konum bilgisi alınamadı. Lütfen tekrar deneyin.')
+        }
+      },
+      (error) => {
+        console.error('Konum alınamadı:', error)
+        alert('Konumunuz alınamadı. Lütfen konum izinlerini kontrol edin.')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    )
   }
 
   const handleMapOpen = (fieldType) => {
@@ -267,19 +499,42 @@ export default function Home() {
   const handleSubmit = (e) => {
     e.preventDefault()
     console.log('Form verileri:', formData)
+    // Form gönderme işlemleri burada yapılacak
   }
 
   const handleServiceSelect = (serviceId) => {
     setFormData(prev => ({ ...prev, service: serviceId }))
-    setCurrentStep(2)
+    setCurrentStep(2) // Tüm hizmetler için 2. adımdan başla
+    setShowModal(true)
   }
 
   const handleNextStep = () => {
+    if (currentStep === 2) {
+      // Konum seçimi adımında
+      if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
+        // Yol yardımı ve lastik için sadece fromLocation kontrolü yap
+        if (!formData.fromLocation) {
+          alert('Lütfen konumunuzu seçin')
+          return
+        }
+      } else {
+        // Diğer hizmetler için her iki konumu da kontrol et
+        if (!formData.fromLocation || !formData.toLocation) {
+          alert('Lütfen her iki konumu da seçin')
+          return
+        }
+      }
+    }
     setCurrentStep(prev => prev + 1)
   }
 
   const handlePrevStep = () => {
-    setCurrentStep(prev => prev - 1)
+    if (currentStep === 2) {
+      // Eğer 2. adımdan geri dönüyorsak, hizmet seçim ekranına dön
+      handleModalClose()
+    } else {
+      setCurrentStep(prev => prev - 1)
+    }
   }
 
   const calculateRoute = async () => {
@@ -310,26 +565,435 @@ export default function Home() {
     }
   }
 
-  const calculatePrice = () => {
-    if (!routeInfo) return null
-
-    // Basit bir fiyat hesaplama örneği
-    const basePrice = {
-      'yol-yardim': 200,
-      'lastik': 150,
-      'cekici': 300,
-      'coklu-cekici': 500
-    }
-
-    const distance = parseFloat(routeInfo.distance.replace(' km', ''))
-    const pricePerKm = 2
-
-    return {
-      basePrice: basePrice[formData.service],
-      distancePrice: distance * pricePerKm,
-      total: basePrice[formData.service] + (distance * pricePerKm)
+  const handlePriceModalClose = () => {
+    setShowPriceModal(false)
+    setShowPrice(false)
+    setCalculatedPrice(null)
+    if (directionsRenderer) {
+      directionsRenderer.setMap(null)
+      setDirectionsRenderer(null)
     }
   }
+
+  const calculatePrice = async () => {
+    if (!formData.fromLat || !formData.fromLng) return;
+
+    // Ataşehir merkez koordinatları
+    const atasehirLocation = {
+      lat: 40.9782,
+      lng: 29.1271
+    };
+
+    let distance;
+    let isIntercity = false;
+    let fromCity = '';
+    let toCity = '';
+    
+    try {
+      if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
+        // Yol yardım ve lastik için Ataşehir'den müşterinin konumuna olan mesafe
+        distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+          new window.google.maps.LatLng(atasehirLocation.lat, atasehirLocation.lng),
+          new window.google.maps.LatLng(formData.fromLat, formData.fromLng)
+        ) / 1000; // km cinsinden
+
+        fromCity = 'İstanbul';
+        const geocoder = new window.google.maps.Geocoder();
+        const response = await geocoder.geocode({
+          location: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) }
+        });
+        
+        if (response.results[0]) {
+          const addressComponents = response.results[0].address_components;
+          const cityComponent = addressComponents.find(
+            component => component.types.includes('administrative_area_level_1')
+          );
+          toCity = cityComponent ? cityComponent.long_name : 'Bilinmiyor';
+          isIntercity = fromCity !== toCity;
+        }
+      } else {
+        // Çekici hizmetleri için başlangıç ve varış noktası arası mesafe
+        distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+          new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
+          new window.google.maps.LatLng(formData.toLat, formData.toLng)
+        ) / 1000;
+
+        const geocoder = new window.google.maps.Geocoder();
+        const [fromResponse, toResponse] = await Promise.all([
+          geocoder.geocode({
+            location: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) }
+          }),
+          geocoder.geocode({
+            location: { lat: parseFloat(formData.toLat), lng: parseFloat(formData.toLng) }
+          })
+        ]);
+
+        if (fromResponse.results[0] && toResponse.results[0]) {
+          const fromComponents = fromResponse.results[0].address_components;
+          const toComponents = toResponse.results[0].address_components;
+          
+          const fromCityComponent = fromComponents.find(
+            component => component.types.includes('administrative_area_level_1')
+          );
+          const toCityComponent = toComponents.find(
+            component => component.types.includes('administrative_area_level_1')
+          );
+
+          fromCity = fromCityComponent ? fromCityComponent.long_name : 'Bilinmiyor';
+          toCity = toCityComponent ? toCityComponent.long_name : 'Bilinmiyor';
+          isIntercity = fromCity !== toCity;
+        }
+      }
+
+      // Mesafe 50km'den fazlaysa şehirler arası kabul et
+      if (distance > 50) {
+        isIntercity = true;
+      }
+
+      // Temel fiyatlar
+      const basePrices = {
+        'yol-yardim': isIntercity ? 2000 : 1500,
+        'lastik': isIntercity ? 2000 : 1500,
+        'cekici': isIntercity ? 3000 : 2000,
+        'coklu-cekici': isIntercity ? 3000 : 2000
+      };
+
+      // Mesafe katsayısı (km başına)
+      const distanceMultiplier = {
+        'yol-yardim': isIntercity ? 20 : 15,
+        'lastik': isIntercity ? 20 : 15,
+        'cekici': isIntercity ? 35 : 30,
+        'coklu-cekici': isIntercity ? 55 : 50
+      };
+
+      // Araç sayısı katsayısı (çoklu çekici için)
+      const vehicleCountMultiplier = formData.service === 'coklu-cekici' ? 
+        (vehicleCount > 1 ? 1 + (vehicleCount - 1) * 0.5 : 1) : 1;
+
+      // Otopark teslim katsayısı
+      const parkingMultiplier = isParkingDelivery ? 1.2 : 1;
+
+      // Temel fiyat
+      const basePrice = basePrices[formData.service] || 0;
+
+      // Mesafe fiyatı
+      const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
+
+      // Toplam fiyat
+      const totalPrice = (basePrice + distancePrice) * vehicleCountMultiplier * parkingMultiplier;
+
+      setCalculatedPrice({
+        basePrice,
+        distancePrice,
+        distance: distance.toFixed(1),
+        totalPrice: Math.round(totalPrice),
+        vehicleCount,
+        vehicleCountMultiplier,
+        parkingMultiplier,
+        isIntercity,
+        fromCity,
+        toCity
+      });
+      setShowPrice(true);
+      setShowPriceModal(true);
+
+      // Haritayı güncelle
+      if (priceMapRef.current) {
+        setTimeout(() => {
+          drawRoute();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Fiyat hesaplama hatası:', error);
+      alert('Fiyat hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+    }
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false)
+    setCurrentStep(1)
+    setFormData({
+      service: '',
+      fromLocation: '',
+      fromLat: '',
+      fromLng: '',
+      toLocation: '',
+      toLat: '',
+      toLng: '',
+      vehicleBrand: '',
+      vehicleModel: '',
+      vehicleYear: '',
+      vehicleType: '',
+      vehiclePlate: '',
+      vehicleCondition: '',
+      phone: ''
+    })
+    setShowMap(false)
+    setActiveLocationField(null)
+  }
+
+  const handleVehicleCountChange = (e) => {
+    const count = parseInt(e.target.value)
+    setVehicleCount(count)
+    setCurrentVehicleIndex(0)
+    // Araç sayısına göre multiVehicleData array'ini güncelle
+    const newVehicleData = Array(count).fill().map((_, index) => ({
+      ...multiVehicleData[index] || {
+        brand: '',
+        model: '',
+        year: '',
+        type: '',
+        plate: '',
+        condition: '',
+        phone: ''
+      }
+    }))
+    setMultiVehicleData(newVehicleData)
+  }
+
+  const handleMultiVehicleChange = (field, value) => {
+    const newVehicleData = [...multiVehicleData]
+    newVehicleData[currentVehicleIndex] = {
+      ...newVehicleData[currentVehicleIndex],
+      [field]: value
+    }
+    setMultiVehicleData(newVehicleData)
+  }
+
+  const handleNextVehicle = () => {
+    if (currentVehicleIndex < multiVehicleData.length - 1) {
+      setCurrentVehicleIndex(prev => prev + 1);
+    } else {
+      setCurrentVehicleIndex(0);
+    }
+  };
+
+  const handlePrevVehicle = () => {
+    if (currentVehicleIndex > 0) {
+      setCurrentVehicleIndex(prev => prev - 1);
+    } else {
+      setCurrentVehicleIndex(multiVehicleData.length - 1);
+    }
+  };
+
+  // Harita başlatma fonksiyonu
+  const initPriceMap = () => {
+    if (!window.google || !priceMapRef.current || priceMap) return
+
+    const mapInstance = new window.google.maps.Map(priceMapRef.current, {
+      center: { lat: 41.0082, lng: 28.9784 },
+      zoom: 11,
+      styles: [
+        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+        {
+          featureType: "administrative.locality",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#d59563" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry",
+          stylers: [{ color: "#38414e" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#212a37" }],
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#9ca5b3" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry",
+          stylers: [{ color: "#746855" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#1f2835" }],
+        },
+        {
+          featureType: "water",
+          elementType: "geometry",
+          stylers: [{ color: "#17263c" }],
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#515c6d" }],
+        },
+      ],
+      disableDefaultUI: true,
+      zoomControl: true,
+    })
+
+    setPriceMap(mapInstance)
+  }
+
+  // Fiyat modalı açıldığında haritayı başlat
+  useEffect(() => {
+    if (showPriceModal && isGoogleLoaded) {
+      setTimeout(() => {
+        initPriceMap()
+      }, 100)
+    }
+  }, [showPriceModal, isGoogleLoaded])
+
+  // Rota çizme fonksiyonu güncelleme
+  const drawRoute = async () => {
+    if (!window.google || !formData.fromLocation) return;
+
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+      const directionsRenderer = new window.google.maps.DirectionsRenderer({
+        suppressMarkers: false,
+        polylineOptions: {
+          strokeColor: '#fbbf24',
+          strokeWeight: 5,
+        },
+      });
+
+      // Haritayı oluştur
+      const map = new window.google.maps.Map(priceMapRef.current, {
+        zoom: 7,
+        center: { lat: 41.0082, lng: 28.9784 },
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }]
+          }
+        ]
+      });
+
+      directionsRenderer.setMap(map);
+
+      // Ataşehir koordinatları
+      const atasehirLocation = { lat: 40.9782, lng: 29.1271 };
+
+      if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
+        // Yol yardım ve lastik için Ataşehir'den müşterinin konumuna rota çiz
+        const request = {
+          origin: atasehirLocation,
+          destination: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        };
+
+        const result = await directionsService.route(request);
+        directionsRenderer.setDirections(result);
+
+        // Mesafeyi güncelle
+        const distance = result.routes[0].legs[0].distance.value / 1000;
+        setCalculatedPrice(prev => ({
+          ...prev,
+          distance: distance.toFixed(1)
+        }));
+      } else {
+        // Çekici hizmetleri için normal rota çizimi
+        const request = {
+          origin: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) },
+          destination: { lat: parseFloat(formData.toLat), lng: parseFloat(formData.toLng) },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        };
+
+        const result = await directionsService.route(request);
+        directionsRenderer.setDirections(result);
+
+        const distance = result.routes[0].legs[0].distance.value / 1000;
+        setCalculatedPrice(prev => ({
+          ...prev,
+          distance: distance.toFixed(1)
+        }));
+      }
+    } catch (error) {
+      console.error('Rota çizilirken hata:', error);
+      alert('Rota çizilemedi. Lütfen konum bilgilerini kontrol edin ve tekrar deneyin.');
+    }
+  };
+
+  // Konum değiştiğinde rotayı güncelle
+  useEffect(() => {
+    if (priceMap && formData.fromLat && formData.fromLng && showPriceModal) {
+      setTimeout(() => {
+        drawRoute()
+      }, 200)
+    }
+  }, [priceMap, formData.fromLat, formData.fromLng, formData.toLat, formData.toLng, showPriceModal])
+
+  // Modal kapandığında haritayı temizle
+  useEffect(() => {
+    if (!showPriceModal) {
+      if (directionsRenderer) {
+        directionsRenderer.setMap(null)
+        setDirectionsRenderer(null)
+      }
+      setPriceMap(null)
+    }
+  }, [showPriceModal])
+
+  const canCalculatePrice = () => {
+    // Temel kontroller
+    if (!formData.phone || !formData.fromLocation) return false;
+
+    // Çoklu çekici kontrolü
+    if (formData.service === 'coklu-cekici') {
+      // Her araç için zorunlu alan kontrolü
+      return multiVehicleData.every(vehicle => 
+        vehicle.brand && 
+        vehicle.model && 
+        vehicle.type && 
+        vehicle.condition
+      );
+    }
+
+    // Diğer hizmetler için kontrol
+    if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
+      return formData.vehicleBrand && 
+             formData.vehicleModel && 
+             formData.vehicleType && 
+             formData.vehicleCondition;
+    } else {
+      // Çekici hizmeti için varış noktası da gerekli
+      return formData.toLocation && 
+             formData.vehicleBrand && 
+             formData.vehicleModel && 
+             formData.vehicleType && 
+             formData.vehicleCondition;
+    }
+  }
+
+  const formatPhoneNumber = (value) => {
+    // Sadece rakamları al
+    const numbers = value.replace(/\D/g, '');
+    
+    // Maksimum 10 rakam
+    const truncated = numbers.slice(0, 10);
+    
+    // Format: 05XX XXX XX XX
+    if (truncated.length === 0) return '';
+    if (truncated.length <= 4) return truncated.replace(/(\d{3})/, '0$1');
+    if (truncated.length <= 7) return truncated.replace(/(\d{3})(\d{3})/, '0$1 $2');
+    if (truncated.length <= 9) return truncated.replace(/(\d{3})(\d{3})(\d{2})/, '0$1 $2 $3');
+    return truncated.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '0$1 $2 $3 $4');
+  };
+
+  const handlePhoneChange = (e, field = 'phone') => {
+    const formattedNumber = formatPhoneNumber(e.target.value);
+    if (field === 'phone') {
+      setFormData(prev => ({ ...prev, phone: formattedNumber }));
+    } else {
+      handleMultiVehicleChange('phone', formattedNumber);
+    }
+  };
+
+  const canAddNewVehicle = () => {
+    return multiVehicleData.length < vehicleCount;
+  };
 
   if (!mounted) {
     return null
@@ -338,337 +1002,588 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-white">
+      <main className="min-h-screen bg-white ">
         {/* Hero Section */}
-        <section className="relative h-[85vh] flex items-center">
+        <section className="relative min-h-[85vh] flex items-center">
           <div className="absolute inset-0 z-0">
             <Image
-              src="/images/home.jpg"
+              src="/images/home.jpeg"
               alt="Çekgetir Yol Yardım"
               fill
               className="object-cover"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-l from-black/100 via-black/80 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-l from-black/95 via-black/75 to-black/30"></div>
           </div>
 
-          <div className="relative z-10 w-full max-w-7xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-center">
+          <div className="relative z-10 w-full max-w-7xl mx-auto px-4 flex flex-col lg:flex-row items-center">
             {/* Sol taraf - Başlık ve Açıklama */}
-            <div className="text-white">
-              <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                7/24 Yol Yardım Hizmetleri
-              </h1>
-              <p className="text-lg md:text-xl mb-8 text-gray-300">
-                Çekici, lastik, akü ve tüm yol yardım hizmetleriyle yanınızdayız
-              </p>
-              <button
-                onClick={() => setShowModal(true)}
-                className="bg-yellow-400 hover:bg-yellow-500 text-black px-8 py-3 rounded-full text-lg font-semibold transition-colors inline-flex items-center gap-2"
-              >
-                Hizmet Talebi Oluştur
-              </button>
+            <div className="w-full lg:w-2/3 mb-8 lg:mb-0">
+              <div className="text-white">
+                <h1 className="text-4xl md:text-6xl font-bold mb-6">
+                  7/24 Yol Yardım Hizmetleri
+                </h1>
+                <p className="text-lg md:text-xl mb-8 text-gray-300">
+                  Çekici, lastik, akü ve tüm yol yardım hizmetleriyle yanınızdayız
+                </p>
+              </div>
             </div>
 
-            {/* Sağ taraf - Hizmet Talep Formu */}
-            <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 shadow-xl border border-white/20">
-              <h2 className="text-2xl font-semibold mb-6 text-white">Hizmet Talebi</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-1">
-                    Hizmet Türü
-                  </label>
-                  <select
-                    name="service"
-                    value={formData.service}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                  >
-                    <option value="cekici" className="text-black">Çekici Hizmeti</option>
-                    <option value="lastik" className="text-black">Lastik Yardımı</option>
-                    <option value="aku" className="text-black">Akü Takviye</option>
-                    <option value="yakit" className="text-black">Yakıt İkmali</option>
-                    <option value="kurtarma" className="text-black">Araç Kurtarma</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-1">
-                    Bulunduğunuz Konum
-                  </label>
+            {/* Sağ taraf - Hizmet Seçimi ve Form Alanı */}
+            <div className="w-full lg:w-1/3">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 lg:p-6 shadow-xl border border-white/20">
+                {!showModal ? (
+                  <>
+                    <h2 className="text-xl lg:text-2xl font-semibold text-white mb-4 lg:mb-6">Hizmet Seçin</h2>
+                    <div className="grid grid-cols-1 gap-3">
+                      {serviceOptions.map(option => (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            handleServiceSelect(option.id)
+                            setShowModal(true)
+                          }}
+                          className="flex items-center gap-3 p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg transition-colors text-left group"
+                        >
+                          <div className="text-yellow-400 group-hover:scale-110 transition-transform">
+                            {option.icon}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-white text-base">{option.title}</h4>
+                            <p className="text-sm text-gray-300">{option.description}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
                   <div className="relative">
-                    <input
-                      ref={fromInputRef}
-                      type="text"
-                      name="fromLocation"
-                      value={formData.fromLocation}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      placeholder="Konum seçin veya yazın"
-                      required
-                      autoComplete="off"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-semibold text-white">Hizmet Talebi</h2>
                       <button
-                        type="button"
-                        onClick={() => getCurrentLocation('from')}
-                        className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                        title="Mevcut Konumu Kullan"
+                        onClick={handleModalClose}
+                        className="text-white/70 hover:text-white"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMapOpen('from')}
-                        className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                        title="Haritadan Seç"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
                     </div>
-                  </div>
-                  {showMap && (
-                    <div className="mt-2 h-[300px] rounded-lg overflow-hidden">
-                      <div ref={mapRef} className="w-full h-full"></div>
-                    </div>
-                  )}
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-1">
-                    Gidilecek Konum
-                  </label>
-                  <div className="relative">
-                    <input
-                      ref={toInputRef}
-                      type="text"
-                      name="toLocation"
-                      value={formData.toLocation}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      placeholder="Konum seçin veya yazın"
-                      autoComplete="off"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => getCurrentLocation('to')}
-                        className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                        title="Mevcut Konumu Kullan"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMapOpen('to')}
-                        className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                        title="Haritadan Seç"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                    {/* Step 2: Konum Seçimi */}
+                    {currentStep === 2 && (
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-medium text-white">Konum Seçin</h3>
+                        <div className="space-y-4">
+                          {(formData.service === 'yol-yardim' || formData.service === 'lastik') ? (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-200 mb-2">
+                                Bulunduğunuz Konum
+                              </label>
+                              <div className="relative">
+                                <input
+                                  ref={fromInputRef}
+                                  type="text"
+                                  name="fromLocation"
+                                  value={formData.fromLocation}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  placeholder="Konum seçin veya yazın"
+                                  required
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => getCurrentLocation('from')}
+                                    className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMapOpen('from')}
+                                    className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Bulunduğunuz Konum
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    ref={fromInputRef}
+                                    type="text"
+                                    name="fromLocation"
+                                    value={formData.fromLocation}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                    placeholder="Konum seçin veya yazın"
+                                    required
+                                  />
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => getCurrentLocation('from')}
+                                      className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMapOpen('from')}
+                                      className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
 
-                {/* Araç Bilgileri */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Araç Markası
-                    </label>
-                    <select
-                      name="vehicleBrand"
-                      value={formData.vehicleBrand}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {vehicleData.brands.map(brand => (
-                        <option key={brand.id} value={brand.id} className="text-black">
-                          {brand.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Araç Modeli
-                    </label>
-                    <select
-                      name="vehicleModel"
-                      value={formData.vehicleModel}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                      disabled={!formData.vehicleBrand}
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {formData.vehicleBrand && vehicleData.models[formData.vehicleBrand].map(model => (
-                        <option key={model} value={model} className="text-black">
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Gidilecek Konum
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    ref={toInputRef}
+                                    type="text"
+                                    name="toLocation"
+                                    value={formData.toLocation}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                    placeholder="Konum seçin veya yazın"
+                                    required
+                                  />
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => getCurrentLocation('to')}
+                                      className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMapOpen('to')}
+                                      className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Model Yılı
-                    </label>
-                    <select
-                      name="vehicleYear"
-                      value={formData.vehicleYear}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                        <option key={year} value={year} className="text-black">
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Araç Tipi
-                    </label>
-                    <select
-                      name="vehicleType"
-                      value={formData.vehicleType}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {vehicleData.types.map(type => (
-                        <option key={type} value={type} className="text-black">
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                          {showMap && (
+                            <div className="h-[400px] rounded-lg overflow-hidden border border-white/20">
+                              <div ref={mapRef} className="w-full h-full"></div>
+                            </div>
+                          )}
+                        </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Vites Tipi
-                    </label>
-                    <select
-                      name="vehicleTransmission"
-                      value={formData.vehicleTransmission}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {vehicleData.transmissions.map(transmission => (
-                        <option key={transmission} value={transmission} className="text-black">
-                          {transmission}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Yakıt Tipi
-                    </label>
-                    <select
-                      name="vehicleFuel"
-                      value={formData.vehicleFuel}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {vehicleData.fuels.map(fuel => (
-                        <option key={fuel} value={fuel} className="text-black">
-                          {fuel}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                        <div className="flex justify-between mt-6">
+                          <button
+                            onClick={handlePrevStep}
+                            className="px-4 py-2 text-gray-300 hover:text-white"
+                          >
+                            Geri
+                          </button>
+                          <button
+                            onClick={handleNextStep}
+                            className="px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                          >
+                            İleri
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Araç Durumu
-                    </label>
-                    <select
-                      name="vehicleCondition"
-                      value={formData.vehicleCondition}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      required
-                    >
-                      <option value="" className="text-black">Seçiniz</option>
-                      {vehicleData.conditions.map(condition => (
-                        <option key={condition} value={condition} className="text-black">
-                          {condition}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-1">
-                      Plaka
-                    </label>
-                    <input
-                      type="text"
-                      name="vehiclePlate"
-                      value={formData.vehiclePlate}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                      placeholder="34XX0000"
-                      required
-                    />
-                  </div>
-                </div>
+                    {/* Step 3: Araç Bilgileri */}
+                    {currentStep === 3 && (
+                      <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+                        
+                        {formData.service === 'coklu-cekici' ? (
+                          <div className="space-y-3">
+                            {/* Otopark Teslim Seçeneği */}
+                            <div className="flex items-start gap-2 rounded-lg">
+                              <input
+                                type="checkbox"
+                                id="parkingDelivery"
+                                checked={isParkingDelivery}
+                                onChange={(e) => setIsParkingDelivery(e.target.checked)}
+                                className="mt-1"
+                              />
+                              <div>
+                                <label htmlFor="parkingDelivery" className="text-white font-medium">
+                                  Otoparktan Teslim
+                                </label>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <p className="text-sm text-gray-300">
+                                    Bu seçenek işaretlendiğinde, araçlar ataşehir adresindeki otoparktan teslim alınacaktır.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-1">
-                    Telefon
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
-                    placeholder="05XX XXX XX XX"
-                    required
-                  />
-                </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-3 px-6 rounded-lg font-semibold transition-colors mt-4"
-                >
-                  Talep Oluştur
-                </button>
-              </form>
+
+                            {/* Mevcut Araç Bilgileri */}
+                            <div className="p-4 bg-white/5 rounded-lg space-y-4">
+                              <div className="flex items-center justify-between sticky top-0 bg-gray-900/90 backdrop-blur-md p-2 rounded-lg z-10">
+                                <div className="flex items-center gap-2 sm:gap-4">
+                                  <h4 className="text-white font-medium text-sm sm:text-base">{currentVehicleIndex + 1} / {multiVehicleData.length}</h4>
+                                  <button
+                                    onClick={() => {
+                                      setMultiVehicleData([...multiVehicleData, {
+                                        brand: '',
+                                        model: '',
+                                        type: '',
+                                        condition: '',
+                                        phone: ''
+                                      }]);
+                                      setCurrentVehicleIndex(multiVehicleData.length);
+                                    }}
+                                    className="px-2 sm:px-3 py-1 bg-yellow-400 text-black rounded hover:bg-yellow-500 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                                  >
+                                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Ekle
+                                  </button>
+                                </div>
+                                {multiVehicleData.length > 1 && (
+                                  <div className="flex items-center gap-1 sm:gap-2">
+                                    <button
+                                      onClick={handlePrevVehicle}
+                                      className="px-2 sm:px-3 py-1 text-gray-300 hover:text-white disabled:opacity-50 text-xs sm:text-sm"
+                                      disabled={currentVehicleIndex === 0}
+                                    >
+                                      Önceki
+                                    </button>
+                                    <button
+                                      onClick={handleNextVehicle}
+                                      className="px-2 sm:px-3 py-1 bg-yellow-400 text-black rounded hover:bg-yellow-500 text-xs sm:text-sm"
+                                    >
+                                      Sonraki
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-200 mb-1">
+                                    Araç Markası
+                                  </label>
+                                  <select
+                                    value={multiVehicleData[currentVehicleIndex].brand}
+                                    onChange={(e) => handleMultiVehicleChange('brand', e.target.value)}
+                                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md text-xs sm:text-sm"
+                                  >
+                                    <option value="">Seçiniz</option>
+                                    {vehicleData.brands.map(brand => (
+                                      <option key={brand.id} value={brand.id}>
+                                        {brand.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-200 mb-1">
+                                    Araç Modeli
+                                  </label>
+                                  <select
+                                    value={multiVehicleData[currentVehicleIndex].model}
+                                    onChange={(e) => handleMultiVehicleChange('model', e.target.value)}
+                                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md text-xs sm:text-sm"
+                                    disabled={!multiVehicleData[currentVehicleIndex].brand}
+                                  >
+                                    <option value="">Seçiniz</option>
+                                    {multiVehicleData[currentVehicleIndex].brand && vehicleData.models[multiVehicleData[currentVehicleIndex].brand].map(model => (
+                                      <option key={model} value={model}>
+                                        {model}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-200 mb-1">
+                                    Araç Tipi
+                                  </label>
+                                  <select
+                                    value={multiVehicleData[currentVehicleIndex].type}
+                                    onChange={(e) => handleMultiVehicleChange('type', e.target.value)}
+                                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md text-xs sm:text-sm"
+                                  >
+                                    <option value="">Seçiniz</option>
+                                    {vehicleData.types.map(type => (
+                                      <option key={type} value={type}>
+                                        {type}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-200 mb-1">
+                                    Araç Durumu
+                                  </label>
+                                  <select
+                                    value={multiVehicleData[currentVehicleIndex].condition}
+                                    onChange={(e) => handleMultiVehicleChange('condition', e.target.value)}
+                                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md text-xs sm:text-sm"
+                                  >
+                                    <option value="">Seçiniz</option>
+                                    <option value="calışmıyor">Çalışıyor</option>
+                                    <option value="arızalı">Arızalı</option>
+                                    <option value="yakıt_bitti">Vites Park Konumundan Çıkmıyor</option>
+                                    <option value="akü">Akü Problemi</option>
+                                  </select>
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-200 mb-1">
+                                    Telefon
+                                  </label>
+                                  <input
+                                    type="tel"
+                                    value={multiVehicleData[currentVehicleIndex].phone || ''}
+                                    onChange={(e) => handleMultiVehicleChange('phone', e.target.value)}
+                                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md text-xs sm:text-sm"
+                                    placeholder="05XX XXX XX XX"
+                                    maxLength={14}
+                                    required
+                                  />
+                                </div>
+                              </div>
+
+                              {multiVehicleData.length > 1 && (
+                                <div className="flex justify-start mt-3 sm:mt-4">
+                                  <button
+                                    onClick={() => {
+                                      const newData = [...multiVehicleData];
+                                      newData.splice(currentVehicleIndex, 1);
+                                      setMultiVehicleData(newData);
+                                      setCurrentVehicleIndex(Math.min(currentVehicleIndex, newData.length - 1));
+                                    }}
+                                    className="px-2 sm:px-3 py-1 text-red-400 hover:text-red-300 transition-colors text-xs sm:text-sm"
+                                  >
+                                    Bu Aracı Sil
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Araç Markası
+                                </label>
+                                <select
+                                  name="vehicleBrand"
+                                  value={formData.vehicleBrand}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  required
+                                >
+                                  <option value="">Seçiniz</option>
+                                  {vehicleData.brands.map(brand => (
+                                    <option key={brand.id} value={brand.id}>
+                                      {brand.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Araç Modeli
+                                </label>
+                                <select
+                                  name="vehicleModel"
+                                  value={formData.vehicleModel}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  required
+                                  disabled={!formData.vehicleBrand}
+                                >
+                                  <option value="">Seçiniz</option>
+                                  {formData.vehicleBrand && vehicleData.models[formData.vehicleBrand].map(model => (
+                                    <option key={model} value={model}>
+                                      {model}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Model Yılı
+                                </label>
+                                <select
+                                  name="vehicleYear"
+                                  value={formData.vehicleYear}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  required
+                                >
+                                  <option value="">Seçiniz</option>
+                                  {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <option key={year} value={year}>
+                                      {year}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Araç Tipi
+                                </label>
+                                <select
+                                  name="vehicleType"
+                                  value={formData.vehicleType}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  required
+                                >
+                                  <option value="">Seçiniz</option>
+                                  {vehicleData.types.map(type => (
+                                    <option key={type} value={type}>
+                                      {type}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  Plaka
+                                </label>
+                                <input
+                                  type="text"
+                                  name="vehiclePlate"
+                                  value={formData.vehiclePlate}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  placeholder="34XX0000"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-200 mb-2">
+                                  {formData.service === 'lastik' ? 'Lastik Durumu' : 'Araç Durumu'}
+                                </label>
+                                <select
+                                  name="vehicleCondition"
+                                  value={formData.vehicleCondition}
+                                  onChange={handleChange}
+                                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                  required
+                                >
+                                  <option value="">Seçiniz</option>
+                                  {formData.service === 'lastik' ? (
+                                    <>
+                                      <option value="patlak">Patlak</option>
+                                      <option value="inmış">İnmiş</option>
+                                      <option value="değişim">Değişim Gerekli</option>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <option value="calışmıyor">Çalışmıyor</option>
+                                      <option value="arızalı">Arızalı</option>
+                                      <option value="yakıt_bitti">Yakıt Bitti</option>
+                                      <option value="akü">Akü Problemi</option>
+                                    </>
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-200 mb-2">
+                                Telefon
+                              </label>
+                              <input
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={(e) => handlePhoneChange(e)}
+                                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent backdrop-blur-md"
+                                placeholder="05XX XXX XX XX"
+                                maxLength={14}
+                                required
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between mt-6">
+                          <button
+                            onClick={handlePrevStep}
+                            className="px-4 py-2 text-gray-300 hover:text-white"
+                          >
+                            Geri
+                          </button>
+                          <button
+                            onClick={calculatePrice}
+                            disabled={!canCalculatePrice()}
+                            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                              canCalculatePrice()
+                                ? 'bg-yellow-400 hover:bg-yellow-500 text-black'
+                                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {!canCalculatePrice() ? 'Lütfen Zorunlu Alanları Doldurun' : 'Fiyat Gör'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
         {/* Hizmetler Section */}
         <section id="hizmetler" className="py-16 px-4">
-          <div className="max-w-6xl mx-auto">
+          <div className="max-w-6xl mx-auto text-black">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Hizmetlerimiz</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
@@ -787,465 +1702,125 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-6 text-black">Yolda mı kaldınız?</h2>
             <p className="text-xl mb-8 text-black/80">Tüm yol yardım hizmetleri için 7/24 yanınızdayız!</p>
-            <a 
-              href="tel:+905XXXXXXXXX" 
-              className="inline-block bg-black text-white px-8 py-3 rounded-full text-lg font-semibold hover:bg-gray-900 transition-colors"
-            >
-              +90 5XX XXX XX XX
-            </a>
-          </div>
-        </section>
-      </main>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Hizmet Talebi</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a 
+                href="tel:+905445931640" 
+                className="inline-block bg-black text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-gray-900 transition-colors flex items-center justify-center gap-2"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-4">
-              {/* Step 1: Hizmet Seçimi */}
-              {currentStep === 1 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {serviceOptions.map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleServiceSelect(option.id)}
-                      className="p-4 border rounded-lg hover:border-yellow-400 hover:bg-yellow-50 transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="text-yellow-400">
-                          {option.icon}
-                        </div>
-                        <h3 className="font-semibold">{option.title}</h3>
-                      </div>
-                      <p className="text-gray-600 text-sm">{option.description}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Step 2: Konum Seçimi */}
-              {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Bulunduğunuz Konum
-                    </label>
-                    <div className="relative">
-                      <input
-                        ref={fromInputRef}
-                        type="text"
-                        name="fromLocation"
-                        value={formData.fromLocation}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        placeholder="Konum seçin veya yazın"
-                        required
-                        autoComplete="off"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => getCurrentLocation('from')}
-                          className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                          title="Mevcut Konumu Kullan"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMapOpen('from')}
-                          className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                          title="Haritadan Seç"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Gidilecek Konum
-                    </label>
-                    <div className="relative">
-                      <input
-                        ref={toInputRef}
-                        type="text"
-                        name="toLocation"
-                        value={formData.toLocation}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        placeholder="Konum seçin veya yazın"
-                        autoComplete="off"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => getCurrentLocation('to')}
-                          className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                          title="Mevcut Konumu Kullan"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMapOpen('to')}
-                          className="p-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
-                          title="Haritadan Seç"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {showMap && (
-                    <div className="mt-2 h-[300px] rounded-lg overflow-hidden">
-                      <div ref={mapRef} className="w-full h-full"></div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between mt-4">
-                    <button
-                      onClick={handlePrevStep}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                    >
-                      Geri
-                    </button>
-                    <button
-                      onClick={handleNextStep}
-                      className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded-lg"
-                    >
-                      İleri
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Araç Bilgileri */}
-              {currentStep === 3 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Araç Markası */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Araç Markası
-                      </label>
-                      <select
-                        name="vehicleBrand"
-                        value={formData.vehicleBrand}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {vehicleData.brands.map(brand => (
-                          <option key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Araç Modeli */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Araç Modeli
-                      </label>
-                      <select
-                        name="vehicleModel"
-                        value={formData.vehicleModel}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                        disabled={!formData.vehicleBrand}
-                      >
-                        <option value="">Seçiniz</option>
-                        {formData.vehicleBrand && vehicleData.models[formData.vehicleBrand].map(model => (
-                          <option key={model} value={model}>
-                            {model}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Model Yılı */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Model Yılı
-                      </label>
-                      <select
-                        name="vehicleYear"
-                        value={formData.vehicleYear}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Araç Tipi */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Araç Tipi
-                      </label>
-                      <select
-                        name="vehicleType"
-                        value={formData.vehicleType}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {vehicleData.types.map(type => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Vites Tipi */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Vites Tipi
-                      </label>
-                      <select
-                        name="vehicleTransmission"
-                        value={formData.vehicleTransmission}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {vehicleData.transmissions.map(transmission => (
-                          <option key={transmission} value={transmission}>
-                            {transmission}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Yakıt Tipi */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Yakıt Tipi
-                      </label>
-                      <select
-                        name="vehicleFuel"
-                        value={formData.vehicleFuel}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {vehicleData.fuels.map(fuel => (
-                          <option key={fuel} value={fuel}>
-                            {fuel}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Araç Durumu */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Araç Durumu
-                      </label>
-                      <select
-                        name="vehicleCondition"
-                        value={formData.vehicleCondition}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Seçiniz</option>
-                        {vehicleData.conditions.map(condition => (
-                          <option key={condition} value={condition}>
-                            {condition}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Plaka */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Plaka
-                      </label>
-                      <input
-                        type="text"
-                        name="vehiclePlate"
-                        value={formData.vehiclePlate}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        placeholder="34XX0000"
-                        required
-                      />
-                    </div>
-
-                    {/* Telefon */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Telefon
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
-                        placeholder="05XX XXX XX XX"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between mt-4">
-                    <button
-                      onClick={handlePrevStep}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                    >
-                      Geri
-                    </button>
-                    <button
-                      onClick={handleNextStep}
-                      className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded-lg"
-                    >
-                      İleri
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Rota ve Fiyat Bilgisi */}
-              {currentStep === 4 && (
-                <div className="space-y-4">
-                  {/* Harita */}
-                  <div className="h-[300px] rounded-lg overflow-hidden border">
-                    <div ref={mapRef} className="w-full h-full"></div>
-                  </div>
-
-                  {/* Rota Bilgileri */}
-                  {routeInfo && (
-                    <div className="bg-gray-50 p-4 rounded-lg border">
-                      <h3 className="font-semibold mb-4">Rota Bilgileri</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-sm text-gray-600">Başlangıç Noktası</p>
-                            <p className="font-medium">{routeInfo.startAddress}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Varış Noktası</p>
-                            <p className="font-medium">{routeInfo.endAddress}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-sm text-gray-600">Toplam Mesafe</p>
-                            <p className="font-medium">{routeInfo.distance}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Tahmini Süre</p>
-                            <p className="font-medium">{routeInfo.duration}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Fiyat Detayları */}
-                  {routeInfo && (
-                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                      <h3 className="font-semibold mb-4">Fiyat Detayları</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Seçilen Hizmet</span>
-                          <span className="font-medium">
-                            {serviceOptions.find(opt => opt.id === formData.service)?.title}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Temel Ücret</span>
-                          <span className="font-medium">
-                            {calculatePrice().basePrice} TL
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Mesafe Ücreti</span>
-                          <span className="font-medium">
-                            {calculatePrice().distancePrice} TL
-                          </span>
-                        </div>
-                        <div className="border-t border-yellow-200 pt-3 mt-3">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold">Tahmini Toplam</span>
-                            <span className="text-2xl font-bold text-yellow-600">
-                              {calculatePrice().total} TL
-                            </span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2">
-                          * Fiyatlar tahmini olup, final fiyat hizmet sonrası belirlenir.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Onay Butonları */}
-                  <div className="flex justify-between mt-4">
-                    <button
-                      onClick={handlePrevStep}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                    >
-                      Geri
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded-lg font-semibold"
-                    >
-                      Talebi Onayla
-                    </button>
-                  </div>
-                </div>
-              )}
+                +90 544 593 16 40
+              </a>
+              <a 
+                href="https://wa.me/905445931640" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-[#25D366] text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-[#1EA952] transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                WhatsApp
+              </a>
             </div>
           </div>
-        </div>
-      )}
+        </section>
 
-      <Footer />
+        {/* Fiyat Modalı */}
+        {showPriceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={handlePriceModalClose}></div>
+            <div className="relative bg-gray-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-2xl font-semibold text-white">Fiyat Bilgisi</h3>
+                  <button
+                    onClick={handlePriceModalClose}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {showPrice && calculatedPrice && (
+                  <div className="space-y-6">
+                    <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-4 mb-6">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-white font-medium">
+                          {calculatedPrice.isIntercity ? 'Şehirler Arası Hizmet' : 'Şehir İçi Hizmet'}
+                        </span>
+                      </div>
+                      {calculatedPrice.fromCity && calculatedPrice.toCity && (
+                        <div className="mt-2 text-sm text-gray-300">
+                          {calculatedPrice.fromCity} {calculatedPrice.isIntercity ? '→' : '↔'} {calculatedPrice.toCity}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-white/5 p-4 rounded-lg">
+                        <div className="text-sm text-gray-400">Temel Ücret</div>
+                        <div className="text-xl font-semibold text-white">{calculatedPrice.basePrice} ₺</div>
+                      </div>
+                      <div className="bg-white/5 p-4 rounded-lg">
+                        <div className="text-sm text-gray-400">Mesafe</div>
+                        <div className="text-xl font-semibold text-white">{calculatedPrice.distance} km</div>
+                      </div>
+                      <div className="bg-white/5 p-4 rounded-lg">
+                        <div className="text-sm text-gray-400">Mesafe Ücreti</div>
+                        <div className="text-xl font-semibold text-white">{Math.round(calculatedPrice.distancePrice)} ₺</div>
+                      </div>
+                      {formData.service === 'coklu-cekici' && (
+                        <div className="bg-white/5 p-4 rounded-lg">
+                          <div className="text-sm text-gray-400">Araç Sayısı</div>
+                          <div className="text-xl font-semibold text-white">{vehicleCount} Araç</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="h-[300px] rounded-lg overflow-hidden border border-white/10 mb-6">
+                      <div ref={priceMapRef} className="w-full h-full"></div>
+                    </div>
+
+                    <div className="border-t border-white/10 pt-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="text-lg text-gray-300">Toplam Tutar</div>
+                        <div className="text-3xl font-bold text-yellow-400">{calculatedPrice.totalPrice} ₺</div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <button
+                          onClick={handlePriceModalClose}
+                          className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Geri Dön
+                        </button>
+                        <button
+                          onClick={() => {
+                            handlePriceModalClose();
+                            setCurrentStep(4);
+                          }}
+                          className="px-6 py-3 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors font-medium"
+                        >
+                          Devam Et
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Footer />
+      </main>
     </>
   )
 }

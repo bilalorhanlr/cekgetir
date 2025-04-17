@@ -20,6 +20,9 @@ const nextConfig = {
       }
     ]
   },
+  images: {
+    domains: ['localhost'],
+  },
   async headers() {
     return [
       {
@@ -27,7 +30,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.googleapis.com https://*.gstatic.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://*.googleapis.com; img-src 'self' blob: data: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://*.gstatic.com; connect-src 'self' https://*.googleapis.com https://maps.googleapis.com"
+            value: "frame-src 'self' https://www.google.com/ https://*.googleapis.com/ https://*.google.com/ https://*.gstatic.com/;"
           }
         ]
       }
