@@ -10,8 +10,8 @@ export default function LoadingSpinner({ size = "small", type = "spinner" }) {
       <div className="flex items-center justify-center">
         <div className={`animate-pulse ${sizeClasses[size]}`}>
           <img 
-            src="/images/flow360.webp" 
-            alt="Flow360 Loading" 
+            src="/images/cekgetir.webp" 
+            alt="cekgetir Loading" 
             className="w-full h-full object-contain"
           />
         </div>

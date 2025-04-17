@@ -256,6 +256,12 @@ export default function Home() {
         return
       }
 
+      // API'nin daha önce yüklenip yüklenmediğini kontrol et
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        setIsGoogleLoaded(true)
+        return
+      }
+
       const script = document.createElement('script')
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,geometry&language=tr`
       script.async = true
@@ -575,10 +581,116 @@ export default function Home() {
     }
   }
 
+  const calculateRouteWithRestrictions = async () => {
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // Direkt rota hesapla
+      const result = await directionsService.route({
+        origin: new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
+        destination: new window.google.maps.LatLng(formData.toLat, formData.toLng),
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        avoidHighways: false,
+        avoidTolls: false
+      });
+
+      // Kullanılan köprüleri tespit et
+      const usedBridges = [];
+      const path = result.routes[0].overview_path;
+      const routeSteps = result.routes[0].legs[0].steps;
+
+      // Köprü tespiti için tüm noktaları kontrol et
+      for (let i = 0; i < path.length; i++) {
+        const point = path[i];
+        bridges.forEach(bridge => {
+          const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+            point,
+            new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+          );
+          if (distance < bridge.radius) {
+            if (!usedBridges.includes(bridge.name)) {
+              usedBridges.push(bridge.name);
+              console.log(`Köprü tespit edildi (konum): ${bridge.name} - Mesafe: ${distance.toFixed(2)} metre`);
+            }
+          }
+        });
+      }
+
+      // Adım adım talimatları kontrol et
+      for (const step of routeSteps) {
+        const instructions = step.instructions.toLowerCase();
+        const startPoint = step.start_location;
+        const endPoint = step.end_location;
+
+        bridges.forEach(bridge => {
+          // Talimatları kontrol et
+          const hasKeyword = bridge.keywords.some(keyword => instructions.includes(keyword.toLowerCase()));
+          if (hasKeyword && !usedBridges.includes(bridge.name)) {
+            usedBridges.push(bridge.name);
+            console.log(`Köprü tespit edildi (talimat): ${bridge.name} - Talimat: ${instructions}`);
+          }
+
+          // Başlangıç ve bitiş noktalarını kontrol et
+          const startDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
+            startPoint,
+            new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+          );
+          const endDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
+            endPoint,
+            new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+          );
+
+          if ((startDistance < bridge.radius || endDistance < bridge.radius) && !usedBridges.includes(bridge.name)) {
+            usedBridges.push(bridge.name);
+            console.log(`Köprü tespit edildi (adım): ${bridge.name} - Başlangıç mesafesi: ${startDistance.toFixed(2)}m, Bitiş mesafesi: ${endDistance.toFixed(2)}m`);
+          }
+        });
+      }
+
+      console.log('Tespit edilen köprüler:', usedBridges);
+
+      // Köprü ücretini hesapla (FSM kullanılıyorsa 100 TL, kullanılmıyorsa 400 TL)
+      const isFSMUsed = usedBridges.some(bridge => bridge === "FSM Köprüsü");
+      const bridgeFee = isFSMUsed ? 100 : 400;
+
+      // Rota detaylarını hazırla
+      let routeDetails = {
+        distance: result.routes[0].legs[0].distance.value / 1000,
+        duration: result.routes[0].legs[0].duration.text,
+        usedRoutes: {
+          bridges: usedBridges,
+        },
+        bridgeFee: bridgeFee
+      };
+
+      console.log('Rota Detayları:', {
+        totalDistance: routeDetails.distance.toFixed(2) + ' km',
+        totalDuration: routeDetails.duration,
+        usedBridges: routeDetails.usedRoutes.bridges,
+        bridgeFee: routeDetails.bridgeFee + ' TL',
+        pathPoints: path.length,
+        startPoint: {
+          lat: formData.fromLat,
+          lng: formData.fromLng
+        },
+        endPoint: {
+          lat: formData.toLat,
+          lng: formData.toLng
+        }
+      });
+
+      return routeDetails;
+    } catch (error) {
+      console.error('Rota hesaplama hatası:', error);
+      alert('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+      throw error;
+    }
+  };
+
   const calculatePrice = async () => {
     if (!formData.fromLat || !formData.fromLng) return;
 
-    // Ataşehir merkez koordinatları
+    // Ataşehir merkez koordinatları - Ferhatpaşa, Anadolu Cd. No:74, 34888 Ataşehir/İstanbul
     const atasehirLocation = {
       lat: 40.9782,
       lng: 29.1271
@@ -597,6 +709,8 @@ export default function Home() {
           new window.google.maps.LatLng(formData.fromLat, formData.fromLng)
         ) / 1000; // km cinsinden
 
+        console.log('Yol Yardım/Lastik Mesafe:', distance.toFixed(2), 'km');
+
         fromCity = 'İstanbul';
         const geocoder = new window.google.maps.Geocoder();
         const response = await geocoder.geocode({
@@ -609,15 +723,205 @@ export default function Home() {
             component => component.types.includes('administrative_area_level_1')
           );
           toCity = cityComponent ? cityComponent.long_name : 'Bilinmiyor';
-          isIntercity = fromCity !== toCity;
+          
+          // Yol yardım ve lastik için sadece İstanbul içi kontrolü
+          if (toCity !== 'İstanbul') {
+            alert('Yol yardım ve lastik hizmetlerimiz şu anda sadece İstanbul içinde sunulmaktadır.');
+            return;
+          }
         }
-      } else {
-        // Çekici hizmetleri için başlangıç ve varış noktası arası mesafe
-        distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-          new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
-          new window.google.maps.LatLng(formData.toLat, formData.toLng)
-        ) / 1000;
 
+        // Temel fiyatlar
+        const basePrices = {
+          'yol-yardim': 1500, // Sadece İstanbul içi
+          'lastik': 1500, // Sadece İstanbul içi
+        };
+
+        // Mesafe katsayısı (km başına)
+        const distanceMultiplier = {
+          'yol-yardim': 15, // Sadece İstanbul içi
+          'lastik': 15, // Sadece İstanbul içi
+        };
+
+        // Ücret hesaplama
+        const basePrice = basePrices[formData.service] || 0;
+        const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
+        const totalPrice = basePrice + distancePrice;
+
+        console.log('Fiyat Hesaplama Detayları:', {
+          basePrice,
+          distancePrice,
+          distance: distance.toFixed(2),
+          totalPrice: Math.round(totalPrice),
+          kdv: Math.round(totalPrice * 0.20),
+          totalWithKdv: Math.round(totalPrice * 1.20)
+        });
+
+        setCalculatedPrice({
+          basePrice,
+          distancePrice,
+          bridgeFee: 0,
+          distance: distance.toFixed(1),
+          totalPrice: Math.round(totalPrice),
+          vehicleCount: 1,
+          vehicleCountMultiplier: 1,
+          parkingMultiplier: 1,
+          isIntercity: false,
+          fromCity: 'İstanbul',
+          toCity: toCity,
+          duration: 'Hesaplanıyor...',
+          usedRoutes: {
+            bridges: []
+          }
+        });
+
+        setShowPrice(true);
+        setShowPriceModal(true);
+
+        if (priceMapRef.current) {
+          setTimeout(() => {
+            drawRoute();
+          }, 100);
+        }
+        return;
+      }
+
+      // Çekici hizmetleri için başlangıç ve varış noktası arası mesafe
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // İstanbul'daki köprülerin koordinatları
+      const bridges = [
+        {
+          name: "15 Temmuz Şehitler Köprüsü",
+          location: { lat: 41.0451, lng: 29.0355 },
+          radius: 1000,
+          keywords: ["15 temmuz", "boğaziçi köprüsü", "şehitler köprüsü"]
+        },
+        {
+          name: "FSM Köprüsü",
+          location: { lat: 41.0904, lng: 29.0560 },
+          radius: 1000,
+          keywords: ["fsm", "fatih sultan mehmet", "2. köprü", "ikinci köprü"]
+        },
+        {
+          name: "Yavuz Sultan Selim Köprüsü",
+          location: { lat: 41.2008, lng: 29.1182 },
+          radius: 1000,
+          keywords: ["yavuz sultan selim", "3. köprü", "üçüncü köprü"]
+        }
+      ];
+
+      try {
+        // Direkt rota hesapla
+        const result = await directionsService.route({
+          origin: new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
+          destination: new window.google.maps.LatLng(formData.toLat, formData.toLng),
+          travelMode: window.google.maps.TravelMode.DRIVING,
+          avoidHighways: false,
+          avoidTolls: false
+        });
+
+        // Kullanılan köprüleri tespit et
+        const usedBridges = [];
+        const path = result.routes[0].overview_path;
+        const routeSteps = result.routes[0].legs[0].steps;
+
+        // Köprü tespiti için tüm noktaları kontrol et
+        for (let i = 0; i < path.length; i++) {
+          const point = path[i];
+          bridges?.forEach(bridge => {
+            const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+              point,
+              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+            );
+            if (distance < bridge.radius) {
+              if (!usedBridges.includes(bridge.name)) {
+                usedBridges.push(bridge.name);
+                console.log(`Köprü tespit edildi (konum): ${bridge.name} - Mesafe: ${distance.toFixed(2)} metre`);
+              }
+            }
+          });
+        }
+
+        // Adım adım talimatları kontrol et
+        for (const step of routeSteps) {
+          const instructions = step.instructions?.toLowerCase() || '';
+          const startPoint = step.start_location;
+          const endPoint = step.end_location;
+
+          bridges?.forEach(bridge => {
+            // Talimatları kontrol et
+            const hasKeyword = bridge.keywords?.some(keyword => instructions.includes(keyword.toLowerCase())) || false;
+            if (hasKeyword && !usedBridges.includes(bridge.name)) {
+              usedBridges.push(bridge.name);
+              console.log(`Köprü tespit edildi (talimat): ${bridge.name} - Talimat: ${instructions}`);
+            }
+
+            // Başlangıç ve bitiş noktalarını kontrol et
+            const startDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
+              startPoint,
+              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+            );
+            const endDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
+              endPoint,
+              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
+            );
+
+            if ((startDistance < bridge.radius || endDistance < bridge.radius) && !usedBridges.includes(bridge.name)) {
+              usedBridges.push(bridge.name);
+              console.log(`Köprü tespit edildi (adım): ${bridge.name} - Başlangıç mesafesi: ${startDistance.toFixed(2)}m, Bitiş mesafesi: ${endDistance.toFixed(2)}m`);
+            }
+          });
+        }
+
+        console.log('Tespit edilen köprüler:', usedBridges);
+
+        // Rota detaylarını hazırla
+        let routeDetails = {
+          distance: result.routes[0].legs[0].distance.value / 1000,
+          duration: result.routes[0].legs[0].duration.text,
+          usedRoutes: {
+            bridges: usedBridges,
+          },
+          bridgeFee: usedBridges.reduce((total, bridge) => {
+            // Köprü ücretleri
+            const bridgeFees = {
+              'FSM Köprüsü': 100,
+              'Yavuz Sultan Selim Köprüsü': 500,
+              '15 Temmuz Şehitler Köprüsü': 400,
+              'Osmangazi Köprüsü': 1000,
+              'Çanakkale Köprüsü': 1000
+            };
+            return total + (bridgeFees[bridge] || 0); // Bilinmeyen köprüler için varsayılan 150 TL
+          }, 0)
+        };
+
+        // Otoyol kontrolü kaldırıldı
+
+        console.log('Rota Detayları:', {
+          totalDistance: routeDetails.distance.toFixed(2) + ' km',
+          totalDuration: routeDetails.duration,
+          usedBridges: routeDetails.usedRoutes.bridges,
+          bridgeFee: routeDetails.bridgeFee + ' TL',
+          pathPoints: path.length,
+          startPoint: {
+            lat: formData.fromLat,
+            lng: formData.fromLng
+          },
+          endPoint: {
+            lat: formData.toLat,
+            lng: formData.toLng
+          }
+        });
+
+        distance = routeDetails.distance;
+
+        console.log('Çekici Hizmeti Mesafe:', distance.toFixed(2), 'km');
+        console.log('Kullanılan Köprüler:', routeDetails.usedRoutes.bridges);
+        console.log('Köprü Ücreti:', routeDetails.bridgeFee, 'TL');
+        console.log('Kullanılan Otoyollar:', routeDetails.usedRoutes.highways);
+
+        // Şehir kontrolü
         const geocoder = new window.google.maps.Geocoder();
         const [fromResponse, toResponse] = await Promise.all([
           geocoder.geocode({
@@ -641,67 +945,148 @@ export default function Home() {
 
           fromCity = fromCityComponent ? fromCityComponent.long_name : 'Bilinmiyor';
           toCity = toCityComponent ? toCityComponent.long_name : 'Bilinmiyor';
-          isIntercity = fromCity !== toCity;
+          
+          console.log('Şehir Bilgileri:', {
+            fromCity,
+            toCity,
+            isIntercity: fromCity !== toCity
+          });
+          
+          // İstanbul içi kontrolü
+          if (fromCity === 'İstanbul' && toCity === 'İstanbul') {
+            isIntercity = false;
+          } else {
+            isIntercity = true;
+          }
         }
-      }
 
-      // Mesafe 50km'den fazlaysa şehirler arası kabul et
-      if (distance > 50) {
-        isIntercity = true;
-      }
+        // Mesafe 50km'den fazlaysa şehirler arası kabul et
+        if (distance > 50) {
+          isIntercity = true;
+        }
 
-      // Temel fiyatlar
-      const basePrices = {
-        'yol-yardim': isIntercity ? 2000 : 1500,
-        'lastik': isIntercity ? 2000 : 1500,
-        'cekici': isIntercity ? 3000 : 2000,
-        'coklu-cekici': isIntercity ? 3000 : 2000
-      };
+        // Temel fiyatlar
+        const basePrices = {
+          'yol-yardim': 1500, // Sadece İstanbul içi
+          'lastik': 1500, // Sadece İstanbul içi
+          'cekici': isIntercity ? 2000 : 1500,
+          'coklu-cekici': isIntercity ? 2000 : 1500
+        };
 
-      // Mesafe katsayısı (km başına)
-      const distanceMultiplier = {
-        'yol-yardim': isIntercity ? 20 : 15,
-        'lastik': isIntercity ? 20 : 15,
-        'cekici': isIntercity ? 35 : 30,
-        'coklu-cekici': isIntercity ? 55 : 50
-      };
+        // Mesafe katsayısı (km başına)
+        const distanceMultiplier = {
+          'yol-yardim': 15, // Sadece İstanbul içi
+          'lastik': 15, // Sadece İstanbul içi
+          'cekici': isIntercity ? 25 : 35,
+          'coklu-cekici': isIntercity ? 45 : 55
+        };
 
-      // Araç sayısı katsayısı (çoklu çekici için)
-      const vehicleCountMultiplier = formData.service === 'coklu-cekici' ? 
-        (vehicleCount > 1 ? 1 + (vehicleCount - 1) * 0.5 : 1) : 1;
+        // Araç durumuna göre ek ücretler
+        const conditionFees = {
+          'arızalı': 200,
+          'vites_p': 300,
+          'kazalı': 300,
+          'yakıt_bitti': 100,
+          'akü': 100
+        };
 
-      // Otopark teslim katsayısı
-      const parkingMultiplier = isParkingDelivery ? 1.2 : 1;
+        // Çoklu çekici için toplam ek ücret hesaplama
+        let totalConditionFee = 0;
+        if (formData.service === 'coklu-cekici') {
+          multiVehicleData.forEach(vehicle => {
+            if (vehicle.condition && conditionFees[vehicle.condition]) {
+              totalConditionFee += conditionFees[vehicle.condition];
+            }
+          });
+        } else {
+          // Tekli çekici için ek ücret hesaplama
+          if (formData.vehicleCondition && conditionFees[formData.vehicleCondition]) {
+            totalConditionFee = conditionFees[formData.vehicleCondition];
+          }
+        }
 
-      // Temel fiyat
-      const basePrice = basePrices[formData.service] || 0;
+        // Araç tipine göre çarpanlar
+        const vehicleTypeMultipliers = {
+          'Sedan': 1.0,
+          'Hatchback': 1.0,
+          'Station Wagon': 1.1,
+          'SUV': 1.2,
+          'Pick-up': 1.3,
+          'Van': 1.3,
+          'Minibüs': 1.4,
+          'Kamyonet': 1.5,
+          'Çekici': 1.6,
+          'Çoklu Çekici': 1.7,
+          'Dorse': 1.8,
+          'İş Makinesi': 2.0,
+          'Kamyon': 2.0,
+          'Otobüs': 2.2,
+          'Yarım Otobüs': 2.0,
+          'Tanker': 2.2,
+          'Romorkör': 2.0
+        };
 
-      // Mesafe fiyatı
-      const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
+        // Ücret hesaplama
+        const basePrice = basePrices[formData.service] || 0;
+        const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
+        const vehicleCountMultiplier = formData.service === 'coklu-cekici' ? 
+          (vehicleCount > 1 ? 1 + (vehicleCount - 1) * 0.5 : 1) : 1;
+        const parkingMultiplier = isParkingDelivery ? 1.2 : 1;
+        const bridgeFee = routeDetails.bridgeFee || 0;
+        const vehicleTypeMultiplier = formData.service === 'coklu-cekici' ? 
+          Math.max(...multiVehicleData.map(vehicle => vehicleTypeMultipliers[vehicle.type] || 1)) :
+          vehicleTypeMultipliers[formData.vehicleType] || 1;
+        const totalPrice = (basePrice + distancePrice + bridgeFee + totalConditionFee) * 
+          vehicleCountMultiplier * parkingMultiplier * vehicleTypeMultiplier;
 
-      // Toplam fiyat
-      const totalPrice = (basePrice + distancePrice) * vehicleCountMultiplier * parkingMultiplier;
+        console.log('Fiyat Hesaplama Detayları:', {
+          basePrice,
+          distancePrice,
+          bridgeFee,
+          conditionFee: totalConditionFee,
+          distance: distance.toFixed(2),
+          vehicleCount,
+          vehicleCountMultiplier,
+          parkingMultiplier,
+          vehicleTypeMultiplier,
+          isIntercity,
+          fromCity,
+          toCity,
+          totalPrice: Math.round(totalPrice),
+          kdv: Math.round(totalPrice * 0.20),
+          totalWithKdv: Math.round(totalPrice * 1.20)
+        });
 
-      setCalculatedPrice({
-        basePrice,
-        distancePrice,
-        distance: distance.toFixed(1),
-        totalPrice: Math.round(totalPrice),
-        vehicleCount,
-        vehicleCountMultiplier,
-        parkingMultiplier,
-        isIntercity,
-        fromCity,
-        toCity
-      });
-      setShowPrice(true);
-      setShowPriceModal(true);
+        setCalculatedPrice({
+          basePrice,
+          distancePrice,
+          bridgeFee: routeDetails.bridgeFee,
+          conditionFee: totalConditionFee,
+          distance: distance.toFixed(1),
+          totalPrice: Math.round(totalPrice),
+          vehicleCount,
+          vehicleCountMultiplier,
+          parkingMultiplier,
+          vehicleTypeMultiplier,
+          isIntercity,
+          fromCity,
+          toCity,
+          duration: routeDetails.duration,
+          usedRoutes: routeDetails.usedRoutes
+        });
 
-      // Haritayı güncelle
-      if (priceMapRef.current) {
-        setTimeout(() => {
-          drawRoute();
-        }, 100);
+        setShowPrice(true);
+        setShowPriceModal(true);
+
+        if (priceMapRef.current) {
+          setTimeout(() => {
+            drawRoute();
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Rota hesaplama hatası:', error);
+        alert('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+        throw error;
       }
     } catch (error) {
       console.error('Fiyat hesaplama hatası:', error);
@@ -938,7 +1323,7 @@ export default function Home() {
 
   const canCalculatePrice = () => {
     // Temel kontroller
-    if (!formData.phone || !formData.fromLocation) return false;
+    if (!formData.fromLocation) return false;
 
     // Çoklu çekici kontrolü
     if (formData.service === 'coklu-cekici') {
@@ -947,11 +1332,14 @@ export default function Home() {
         vehicle.brand && 
         vehicle.model && 
         vehicle.type && 
-        vehicle.condition
+        vehicle.condition &&
+        vehicle.phone // Her araç için telefon kontrolü eklendi
       );
     }
 
     // Diğer hizmetler için kontrol
+    if (!formData.phone) return false; // Diğer hizmetler için telefon kontrolü
+
     if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
       return formData.vehicleBrand && 
              formData.vehicleModel && 
@@ -993,6 +1381,61 @@ export default function Home() {
 
   const canAddNewVehicle = () => {
     return multiVehicleData.length < vehicleCount;
+  };
+
+  const calculateRouteWith15TemmuzBridge = async () => {
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // 15 Temmuz Köprüsü'nün koordinatları
+      const bridgeLocation = bridges.find(b => b.name === "15 Temmuz Şehitler Köprüsü").location;
+      
+      // Başlangıç noktasından köprüye rota
+      const toBridgeResult = await directionsService.route({
+        origin: new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
+        destination: new window.google.maps.LatLng(bridgeLocation.lat, bridgeLocation.lng),
+        travelMode: window.google.maps.TravelMode.DRIVING
+      });
+
+      // Köprüden varış noktasına rota
+      const fromBridgeResult = await directionsService.route({
+        origin: new window.google.maps.LatLng(bridgeLocation.lat, bridgeLocation.lng),
+        destination: new window.google.maps.LatLng(formData.toLat, formData.toLng),
+        travelMode: window.google.maps.TravelMode.DRIVING
+      });
+
+      // Rota detaylarını birleştir
+      const totalDistance = (toBridgeResult.routes[0].legs[0].distance.value + 
+                           fromBridgeResult.routes[0].legs[0].distance.value) / 1000;
+      
+      const totalDuration = toBridgeResult.routes[0].legs[0].duration.text + 
+                           " + " + 
+                           fromBridgeResult.routes[0].legs[0].duration.text;
+
+      const routeDetails = {
+        distance: totalDistance,
+        duration: totalDuration,
+        usedRoutes: {
+          bridges: ["15 Temmuz Şehitler Köprüsü"],
+        },
+        bridgeFee: 150, // 15 Temmuz Köprüsü için 150 TL
+        toBridgePath: toBridgeResult.routes[0].overview_path,
+        fromBridgePath: fromBridgeResult.routes[0].overview_path
+      };
+
+      console.log('15 Temmuz Köprüsü Rota Detayları:', {
+        totalDistance: routeDetails.distance.toFixed(2) + ' km',
+        totalDuration: routeDetails.duration,
+        usedBridges: routeDetails.usedRoutes.bridges,
+        bridgeFee: routeDetails.bridgeFee + ' TL'
+      });
+
+      return routeDetails;
+    } catch (error) {
+      console.error('15 Temmuz Köprüsü rota hesaplama hatası:', error);
+      alert('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+      throw error;
+    }
   };
 
   if (!mounted) {
@@ -1154,7 +1597,7 @@ export default function Home() {
                                     </button>
                                   </div>
                                 </div>
-                              </div>
+            </div>
 
                               <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -1249,7 +1692,7 @@ export default function Home() {
                                   </p>
                                 </div>
                               </div>
-                            </div>
+            </div>
 
 
 
@@ -1276,7 +1719,7 @@ export default function Home() {
                                     </svg>
                                     Ekle
                                   </button>
-                                </div>
+            </div>
                                 {multiVehicleData.length > 1 && (
                                   <div className="flex items-center gap-1 sm:gap-2">
                                     <button
@@ -1292,9 +1735,9 @@ export default function Home() {
                                     >
                                       Sonraki
                                     </button>
-                                  </div>
+          </div>
                                 )}
-                              </div>
+        </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                 <div>
@@ -1363,7 +1806,7 @@ export default function Home() {
                                   >
                                     <option value="">Seçiniz</option>
                                     <option value="calışmıyor">Çalışıyor</option>
-                                    <option value="arızalı">Arızalı</option>
+                                    <option value="arızalı">Kazalı</option>
                                     <option value="yakıt_bitti">Vites Park Konumundan Çıkmıyor</option>
                                     <option value="akü">Akü Problemi</option>
                                   </select>
@@ -1381,9 +1824,9 @@ export default function Home() {
                                     placeholder="05XX XXX XX XX"
                                     maxLength={14}
                                     required
-                                  />
-                                </div>
-                              </div>
+              />
+            </div>
+          </div>
 
                               {multiVehicleData.length > 1 && (
                                 <div className="flex justify-start mt-3 sm:mt-4">
@@ -1444,8 +1887,8 @@ export default function Home() {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
-                            </div>
+                </div>
+              </div>
 
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -1466,7 +1909,7 @@ export default function Home() {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
+                </div>
 
                               <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -1486,8 +1929,8 @@ export default function Home() {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
-                            </div>
+              </div>
+                </div>
 
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -1503,7 +1946,7 @@ export default function Home() {
                                   placeholder="34XX0000"
                                   required
                                 />
-                              </div>
+              </div>
 
                               <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -1532,8 +1975,8 @@ export default function Home() {
                                     </>
                                   )}
                                 </select>
-                              </div>
-                            </div>
+                </div>
+              </div>
 
                             <div>
                               <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -1549,8 +1992,8 @@ export default function Home() {
                                 maxLength={14}
                                 required
                               />
-                            </div>
-                          </div>
+            </div>
+          </div>
                         )}
 
                         <div className="flex justify-between mt-6">
@@ -1571,8 +2014,8 @@ export default function Home() {
                           >
                             {!canCalculatePrice() ? 'Lütfen Zorunlu Alanları Doldurun' : 'Fiyat Gör'}
                           </button>
-                        </div>
-                      </div>
+        </div>
+      </div>
                     )}
                   </div>
                 )}
@@ -1649,53 +2092,56 @@ export default function Home() {
           <div className="max-w-6xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900">Neden Bizi Seçmelisiniz?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="flex items-start space-x-4">
-                <div className="bg-yellow-400 text-black p-3 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-black">7/24 Hizmet</h3>
-                  <p className="text-gray-500">Günün her saati, yılın her günü yanınızdayız. Acil durumlarınızda bize ulaşın.</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-4">
-                <div className="bg-yellow-400 text-black p-3 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-black">Hızlı Müdahale</h3>
-                  <p className="text-gray-500">Ortalama 30 dakika içinde olay yerine ulaşıyoruz.</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-4">
+              <div className="flex items-start space-x-4 bg-white p-6 rounded-lg shadow-md">
                 <div className="bg-yellow-400 text-black p-3 rounded-full">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-black">Profesyonel Ekip</h3>
-                  <p className="text-gray-500">Uzman ekibimiz ve modern ekipmanlarımızla her türlü yol yardım hizmeti.</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-4">
-                <div className="bg-yellow-400 text-black p-3 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-black">Uygun Fiyat</h3>
-                  <p className="text-gray-500">Şeffaf ve rekabetçi fiyatlarla kaliteli hizmet sunuyoruz.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold mb-2 text-black">Güvenilir Hizmet Ağı</h3>
+          <p className="text-gray-600">Türkiye genelinde şehirler arası araç transferi ve İstanbul içerisinde 7/24 yol yardım hizmeti sunan firmamız, ihtiyaç duyduğunuz her an ulaşılabilir ve çözüm odaklı hizmet anlayışı ile yanınızdadır.</p>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-yellow-400 text-black p-3 rounded-full">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold mb-2 text-black">Deneyimli ve Yetkin Ekip</h3>
+          <p className="text-gray-600">Tüm operasyonlarımız, alanında uzman, belgeli ve tecrübeli personellerimiz tarafından titizlikle yürütülmektedir. Sürücü kadromuz, taşıma sırasında gerekli tüm prosedürlere hakimdir.</p>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-yellow-400 text-black p-3 rounded-full">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold mb-2 text-black">Araç Tipine Uygun Taşıma Çözümleri</h3>
+          <p className="text-gray-600">Binek araçlardan SUV'lara, çift kabin araçlardan motosikletlere kadar farklı türdeki araçlar için özel taşıma çözümleri sunmaktayız. Her araç tipi için uygun ekipman ve taşıma sistemlerine sahibiz.</p>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-yellow-400 text-black p-3 rounded-full">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold mb-2 text-black">Şeffaf ve Sabit Fiyat Politikası</h3>
+          <p className="text-gray-600">Hizmet öncesinde net fiyat bilgisi sunulmakta, herhangi bir sürpriz ücretle karşılaşmanız önlenmektedir. Fiyatlandırmalar mesafe, araç tipi ve ek hizmetlere göre belirlenmektedir.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
         {/* İletişim CTA Section */}
         <section className="py-16 px-4 bg-yellow-400">
@@ -1731,13 +2177,13 @@ export default function Home() {
         {showPriceModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70" onClick={handlePriceModalClose}></div>
-            <div className="relative bg-gray-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="relative bg-[#141414] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-2xl font-semibold text-white">Fiyat Bilgisi</h3>
+                  <h3 className="text-2xl font-semibold text-[#ebebeb]">Fiyat Bilgisi</h3>
                   <button
                     onClick={handlePriceModalClose}
-                    className="text-gray-400 hover:text-white transition-colors"
+                    className="text-[#ebebeb] hover:text-white transition-colors"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1747,57 +2193,80 @@ export default function Home() {
 
                 {showPrice && calculatedPrice && (
                   <div className="space-y-6">
-                    <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-4 mb-6">
+                    <div className="bg-[#404040] border border-[#404040] rounded-lg p-4 mb-6">
                       <div className="flex items-center gap-2">
                         <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="text-white font-medium">
+                        <span className="text-[#ebebeb] font-medium">
                           {calculatedPrice.isIntercity ? 'Şehirler Arası Hizmet' : 'Şehir İçi Hizmet'}
                         </span>
                       </div>
                       {calculatedPrice.fromCity && calculatedPrice.toCity && (
-                        <div className="mt-2 text-sm text-gray-300">
+                        <div className="mt-2 text-sm text-[#ebebeb]">
                           {calculatedPrice.fromCity} {calculatedPrice.isIntercity ? '→' : '↔'} {calculatedPrice.toCity}
                         </div>
                       )}
+                      <div className="mt-2 text-sm text-[#ebebeb] flex items-center gap-2">
+                        <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-[#ebebeb] font-medium">
+                          Tahmini Varış Süresi: <span className="text-yellow-400 font-semibold">{calculatedPrice.duration || 'Hesaplanıyor...'}</span>
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-white/5 p-4 rounded-lg">
-                        <div className="text-sm text-gray-400">Temel Ücret</div>
-                        <div className="text-xl font-semibold text-white">{calculatedPrice.basePrice} ₺</div>
-                      </div>
-                      <div className="bg-white/5 p-4 rounded-lg">
-                        <div className="text-sm text-gray-400">Mesafe</div>
-                        <div className="text-xl font-semibold text-white">{calculatedPrice.distance} km</div>
-                      </div>
-                      <div className="bg-white/5 p-4 rounded-lg">
-                        <div className="text-sm text-gray-400">Mesafe Ücreti</div>
-                        <div className="text-xl font-semibold text-white">{Math.round(calculatedPrice.distancePrice)} ₺</div>
-                      </div>
-                      {formData.service === 'coklu-cekici' && (
-                        <div className="bg-white/5 p-4 rounded-lg">
-                          <div className="text-sm text-gray-400">Araç Sayısı</div>
-                          <div className="text-xl font-semibold text-white">{vehicleCount} Araç</div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="h-[300px] rounded-lg overflow-hidden border border-white/10 mb-6">
+                    <div className="h-[300px] rounded-lg overflow-hidden border border-[#404040] mb-6">
                       <div ref={priceMapRef} className="w-full h-full"></div>
                     </div>
 
-                    <div className="border-t border-white/10 pt-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <div className="text-lg text-gray-300">Toplam Tutar</div>
-                        <div className="text-3xl font-bold text-yellow-400">{calculatedPrice.totalPrice} ₺</div>
+                    <div className="border-t border-[#404040] pt-6">
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex justify-between items-center w-full">
+                          <div className="text-lg text-[#ebebeb]">KDV Hariç Tutar</div>
+                          <div className="text-2xl font-semibold text-[#ebebeb]">
+                            {Math.round(calculatedPrice.totalPrice + 
+                              (calculatedPrice.usedRoutes?.bridges?.length > 0 ? 150 : 0)
+                            )} ₺
+                          </div>
+                        </div>
+                        {calculatedPrice.conditionFee > 0 && (
+                          <div className="flex justify-between items-center w-full">
+                            <div className="text-lg text-[#ebebeb]">Araç Durumu Ek Ücreti</div>
+                            <div className="text-xl text-[#ebebeb]">
+                              {calculatedPrice.conditionFee} ₺
+                            </div>
+                          </div>
+                        )}
+                        {calculatedPrice.vehicleTypeMultiplier > 1 && (
+                          <div className="flex justify-between items-center w-full">
+                            <div className="text-lg text-[#ebebeb]">Araç Tipi Çarpanı</div>
+                            <div className="text-xl text-[#ebebeb]">
+                              {calculatedPrice.vehicleTypeMultiplier.toFixed(1)}x
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center w-full">
+                          <div className="text-lg text-[#ebebeb]">KDV (%20)</div>
+                          <div className="text-xl text-[#ebebeb]">
+                            {Math.round((calculatedPrice.totalPrice + 
+                              (calculatedPrice.usedRoutes?.bridges?.length > 0 ? 150 : 0)) * 0.20)} ₺
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center w-full">
+                          <div className="text-lg text-[#ebebeb]">Toplam Tutar (KDV Dahil)</div>
+                          <div className="text-3xl font-bold text-yellow-400">
+                            {Math.round((calculatedPrice.totalPrice + 
+                              (calculatedPrice.usedRoutes?.bridges?.length > 0 ? 150 : 0)) * 1.20)} ₺
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                         <button
                           onClick={handlePriceModalClose}
-                          className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                          className="px-6 py-3 bg-[#404040] text-[#ebebeb] rounded-lg hover:bg-[#505050] transition-colors"
                         >
                           Geri Dön
                         </button>
@@ -1819,7 +2288,7 @@ export default function Home() {
           </div>
         )}
 
-        <Footer />
+      <Footer />
       </main>
     </>
   )

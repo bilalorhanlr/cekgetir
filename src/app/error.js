@@ -16,8 +16,8 @@ export default function Error({
       <div className="text-center space-y-4 md:space-y-6">
         <div className="w-32 h-32 md:w-48 md:h-48 mx-auto mb-4 md:mb-8 opacity-50">
           <Image
-            src="/images/flow360.webp"
-            alt="Flow360"
+            src="/images/cekgetir.webp"
+            alt="cekgetir"
             width={1000}
             height={1000}
             className="w-full h-full object-contain"

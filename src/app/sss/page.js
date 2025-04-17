@@ -1,14 +1,76 @@
 'use client'
 
+import { useState } from 'react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import Image from 'next/image'
 
 export default function FAQ() {
+  const [openIndex, setOpenIndex] = useState(null)
+
+  const faqs = [
+    {
+      question: "Araç transferi hizmeti nedir?",
+      answer: "Araç transfer hizmeti, şehir içi ve şehirler arası olmak üzere araçların çekicilerimiz vasıtasıyla taşınmasıdır."
+    },
+    {
+      question: "Yol yardım ve çekici hizmetleri hangi illeri kapsıyor?",
+      answer: "Acil yol yardım hizmetimiz şu anda sadece İstanbul ili içerisinde, şehirler arası taşıma hizmetimiz ise Türkiye'nin tüm illerinde gerçekleşmektedir."
+    },
+    {
+      question: "Hangi tür araçlara hizmet veriliyor?",
+      answer: "Çekicilerimiz binek, suv, çift kabin, minivan ve motosiklet türlerinde taşıma hizmeti vermektedir."
+    },
+    {
+      question: "Hizmet saatleri ve sıklığı nedir?",
+      answer: "Şehir içi olarak İstanbul ilinde 7/24 yol yardım hizmeti vermekteyiz. Buna ek olarak şehirler arası transferlerimizde aracınızın gideceği ilin uzaklığı, aracınızın durumu ve taşımaya uygunluğu esas alınarak araç transferlerinin süresi değişkenlik gösterebilmektedir."
+    },
+    {
+      question: "Hizmetleriniz haftanın her günü ve günün her saati aktif mi?",
+      answer: "Çekicilerimiz sizlere hizmet edebilmek adına 7/24 çalışmaktadır. Buna ek olarak gece saatlerinde, bayram günlerinde ve resmi tatillerde hizmet süresi değişkenlik gösterebilmektedir."
+    },
+    {
+      question: "Çekici hizmeti ne kadar sürede gelir?",
+      answer: "İstanbul içi hizmetlerde, yoğunluğa ve bulunduğunuz konuma bağlı olarak ortalama 30-60 dakika içerisinde ekiplerimiz ulaşmaktadır. Şehirler arası taleplerde ise transfer planlaması yapılarak size uygun tarih ve saat belirlenir."
+    },
+    {
+      question: "Hizmet almadan önce fiyat alabilir miyim?",
+      answer: "Elbette. Taşıma yapılacak mesafe, araç tipi ve varsa ekstra taleplerinize göre size net bir fiyat bilgisi sunuyoruz."
+    },
+    {
+      question: "Çekici talebini nasıl iletebilirim?",
+      answer: "Web sitemiz üzerinden, WhatsApp hattımızdan ya da telefon numaramız üzerinden yardım talebinde bulunabilirsiniz. Konumunuzu bizimle paylaşmanız, işlemin hızlıca başlamasını sağlar."
+    },
+    {
+      question: "Bozuk veya çalışmayan araçlar da taşınabiliyor mu?",
+      answer: "Evet, çalışmayan ya da hasarlı araçlar da çekicilerimiz ile güvenle taşınabilmektedir."
+    },
+    {
+      question: "Uzun mesafeli transferlerde yakıt, köprü ve otoyol ücretleri kime aittir?",
+      answer: "Taşıma sırasında oluşabilecek tüm masraflar (köprü, otoyol, feribot vb.) taşıma ücretine dahildir."
+    },
+    {
+      question: "Rezervasyon sistemi var mı?",
+      answer: "Evet, özellikle şehirler arası taşımalarda önceden rezervasyon yaptırarak tarih ve saat belirtebilirsiniz. Bu sayede planlamanız kolaylaşır."
+    },
+    {
+      question: "Ödeme yöntemleri nelerdir?",
+      answer: "Havale, eft ve nakit ödeme kabul ediyoruz."
+    },
+    {
+      question: "Şehirler arası araç transferleri nasıl gerçekleştiriliyor?",
+      answer: "Cekgetir.com, Türkiye genelindeki güvenilir taşıma firmalarıyla oluşturduğu iş birliği ağı sayesinde, şehirler arası transfer taleplerinizi en hızlı ve uygun şekilde organize eder."
+    },
+    {
+      question: "Şehirler arası çekici firmasıyım, Cekgetir.com'a nasıl başvurabilirim?",
+      answer: "Cekgetir.com iş ortağı ağına katılmak isteyen şehirler arası çekici firmaları, web sitemiz üzerinden başvuru formunu doldurarak veya iletişim kanallarımız aracılığıyla bizimle iletişime geçebilir. Başvurular, hizmet kalitesi, bölgesel uygunluk ve operasyonel kapasite kriterlerine göre değerlendirilir. Uygun görülen firmalarla sözleşmeli iş ortaklığı süreci başlatılır."
+    }
+  ]
+
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-white pt-20">
+      <main className="min-h-screen bg-gray-100 pt-20">
         {/* Hero Section */}
         <section className="relative h-[40vh] flex items-center">
           <div className="absolute inset-0 z-0">
@@ -29,40 +91,31 @@ export default function FAQ() {
 
         {/* FAQ Section */}
         <section className="py-16 px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Hizmet bölgeniz neresi?</h3>
-                <p className="text-gray-600">İstanbul'un tüm ilçelerinde hizmet vermekteyiz. Avrupa ve Anadolu yakasında 7/24 yol yardım hizmeti sunuyoruz.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Ne kadar sürede ulaşıyorsunuz?</h3>
-                <p className="text-gray-600">Ortalama 30-45 dakika içinde olay yerine ulaşıyoruz. Trafik durumuna göre bu süre değişebilir.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Ödeme yöntemleri nelerdir?</h3>
-                <p className="text-gray-600">Nakit, kredi kartı ve havale/EFT ile ödeme yapabilirsiniz. Fatura ve fiş hizmetimiz mevcuttur.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Hangi araçlara hizmet veriyorsunuz?</h3>
-                <p className="text-gray-600">Otomobil, SUV, minibüs, kamyonet, kamyon, tır ve iş makineleri dahil tüm araçlara hizmet veriyoruz.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Sigorta anlaşmanız var mı?</h3>
-                <p className="text-gray-600">Tüm büyük sigorta şirketleriyle anlaşmalıyız. Sigortalı araçlar için ekstra ücret talep etmiyoruz.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Acil durumlarda ne yapmalıyım?</h3>
-                <p className="text-gray-600">Hemen bizi arayın: +90 544 593 16 40. Konumunuzu paylaşın, en kısa sürede yanınızda olacağız.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Çoklu araç çekme hizmetiniz var mı?</h3>
-                <p className="text-gray-600">Evet, aynı anda birden fazla aracı çekebiliyoruz. Her ek araç için özel fiyatlandırma yapıyoruz.</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4">Otopark teslim hizmetiniz var mı?</h3>
-                <p className="text-gray-600">Evet, aracınızı otoparktan teslim alıp, istediğiniz otoparka teslim edebiliyoruz. Bu hizmet için ek ücret alınmaktadır.</p>
-              </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <div key={index} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                  <button
+                    className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
+                    onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                  >
+                    <h3 className="text-lg font-semibold text-gray-800">{faq.question}</h3>
+                    <svg
+                      className={`w-6 h-6 transform transition-transform ${openIndex === index ? 'rotate-180' : ''} text-gray-600`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {openIndex === index && (
+                    <div className="px-6 pb-4 bg-gray-50">
+                      <p className="text-gray-700">{faq.answer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </section>

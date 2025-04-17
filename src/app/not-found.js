@@ -7,8 +7,8 @@ export default function NotFound() {
       <div className="text-center space-y-4 md:space-y-6">
         <div className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 md:mb-8 opacity-50">
           <Image
-            src="/images/flow360.webp"
-            alt="Flow360"
+            src="/images/cekgetir.webp"
+            alt="cekgetir"
             width={96}
             height={96}
             className="w-full h-full object-contain"

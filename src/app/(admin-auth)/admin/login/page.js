@@ -183,8 +183,8 @@ export default function AdminLoginPage() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <Image
-            src="/images/flow360.webp"
-            alt="Flow360 Logo"
+            src="/images/cekgetir.webp"
+            alt="cekgetir Logo"
             width={2000}
             height={2000}
             priority
@@ -216,7 +216,7 @@ export default function AdminLoginPage() {
                     setFormData(prev => ({ ...prev, email: e.target.value }))
                   }}
                   className="w-full px-4 py-3 bg-black/50 border border-white/20 rounded-lg text-white"
-                  placeholder="ornek@flow360.com"
+                  placeholder="ornek@cekgetir.com"
                   disabled={isLoading}
                 />
               </div>

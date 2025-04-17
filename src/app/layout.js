@@ -7,12 +7,12 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  metadataBase: new URL('https://flow360.com'),
-  title: 'Flow360 | Türkiye\'nin En Büyük Rap Yarışması',
-  description: 'Flow360, Türkiye\'nin en prestijli rap yarışması. Birçok ünlü rapçinin jüri olduğu yarışmaya sen de katıl!',
+  metadataBase: new URL('https://cekgetir.com'),
+  title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
+  description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Birçok ünlü rapçinin jüri olduğu yarışmaya sen de katıl!',
   keywords: [
     'rap yarışması', 
-    'flow360', 
+    'cekgetir', 
     'türkçe rap',
     'freestyle',
     'hiphop yarışması',
@@ -24,16 +24,16 @@ export const metadata = {
     'rap yetenek yarışması'
   ].join(', '),
   openGraph: {
-    title: 'Flow360 | Türkiye\'nin En Büyük Rap Yarışması',
-    description: 'Flow360, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
-    url: 'https://flow360.com',
-    siteName: 'Flow360',
+    title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
+    description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
+    url: 'https://cekgetir.com',
+    siteName: 'cekgetir',
     images: [
       {
-        url: '/images/flow360.webp',
+        url: '/images/cekgetir.webp',
         width: 1200,
         height: 630,
-        alt: 'Flow360 Rap Yarışması',
+        alt: 'cekgetir Rap Yarışması',
       },
     ],
     locale: 'tr_TR',
@@ -41,9 +41,9 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Flow360 | Türkiye\'nin En Büyük Rap Yarışması',
-    description: 'Flow360, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
-    images: ['/images/flow360.webp'],
+    title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
+    description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
+    images: ['/images/cekgetir.webp'],
   },
   robots: {
     index: true,
@@ -60,9 +60,9 @@ export const metadata = {
     google: 'google-site-verification-code', // Google Search Console doğrulama kodu
   },
   alternates: {
-    canonical: 'https://flow360.com',
+    canonical: 'https://cekgetir.com',
   },
-  authors: [{ name: 'Flow360 Team' }],
+  authors: [{ name: 'cekgetir Team' }],
   category: 'Müzik',
   icons: {
     icon: '/favicon.ico',

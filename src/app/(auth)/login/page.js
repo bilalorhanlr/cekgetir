@@ -490,8 +490,8 @@ export default function LoginPage() {
                 {/* Logo - Mobilde gizli, desktop'ta sol kolonda */}
                 <div className="hidden md:flex md:w-1/2 items-center justify-center p-8">
                     <Image
-                        src="/images/flow360.webp"
-                        alt="Flow360"
+                        src="/images/cekgetir.webp"
+                        alt="cekgetir"
                         width={1024}
                         height={1024}
                         className="w-full h-auto object-contain"
@@ -505,8 +505,8 @@ export default function LoginPage() {
                         {/* Logo - Sadece mobilde görünür */}
                         <div className="md:hidden mb-8 text-center">
                             <Image
-                                src="/images/flow360.webp"
-                                alt="Flow360"
+                                src="/images/cekgetir.webp"
+                                alt="cekgetir"
                                 width={300}
                                 height={100}
                                 className="w-48 mx-auto"

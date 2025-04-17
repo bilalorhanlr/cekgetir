@@ -553,8 +553,8 @@ export default function RegisterPage() {
         {/* Logo - Mobilde gizli, desktop'ta sol kolonda */}
         <div className="hidden md:flex md:w-1/2 items-center justify-center p-8">
           <Image
-            src="/images/flow360.webp"
-            alt="Flow360"
+            src="/images/cekgetir.webp"
+            alt="cekgetir"
             width={1024}
             height={1024}
             className="w-full h-auto object-contain"
@@ -568,8 +568,8 @@ export default function RegisterPage() {
             {/* Logo - Sadece mobilde görünür */}
             <div className="md:hidden w-full max-w-[200px] mx-auto mb-8">
               <Image
-                src="/images/flow360.webp"
-                alt="Flow360"
+                src="/images/cekgetir.webp"
+                alt="cekgetir"
                 width={1024}
                 height={1024}
                 className="w-full h-auto object-contain"
@@ -920,9 +920,9 @@ export default function RegisterPage() {
                   <h4 className="text-lg font-bold text-white mb-2">1. Veri Sorumlusu</h4>
                   <p>
                     Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") uyarınca,
-                    kişisel verilerinizin flow360.com (bundan sonra "Site" olarak anılacaktır) tarafından nasıl
+                    kişisel verilerinizin cekgetir.com (bundan sonra "Site" olarak anılacaktır) tarafından nasıl
                     işleneceği konusunda sizi bilgilendirmek amacıyla hazırlanmıştır. Veri sorumlusu olarak,
-                    flow360.com olarak sizlere ait kişisel verilerin gizliliği ve güvenliği hususunda azami özeni
+                    cekgetir.com olarak sizlere ait kişisel verilerin gizliliği ve güvenliği hususunda azami özeni
                     göstermekteyiz.
                   </p>
                 </section>
@@ -971,7 +971,7 @@ export default function RegisterPage() {
                 <section>
                   <h4 className="text-lg font-bold text-white mb-2">5. Kişisel Verilerin Toplanma Yöntemleri ve Hukuki Sebebi</h4>
                   <p>
-                    Kişisel verileriniz, flow360.com web sitesi, mobil uygulamalar, çerezler (cookies) ve benzeri
+                    Kişisel verileriniz, cekgetir.com web sitesi, mobil uygulamalar, çerezler (cookies) ve benzeri
                     yöntemlerle elektronik ortamda toplanmaktadır. Bu veriler, yarışma süreçlerinin yürütülmesi
                     ve kullanıcı memnuniyeti gibi meşru menfaatler doğrultusunda ve KVKK madde 5/2 ve
                     madde 6 kapsamında işlenmektedir.
@@ -1011,7 +1011,7 @@ export default function RegisterPage() {
                     içinde sonuçlandıracağız.
                   </p>
                   <p className="mt-2">
-                    flow360.com kişisel verilerinizin güvenliğini sağlamak için gerekli teknik ve idari tedbirleri
+                    cekgetir.com kişisel verilerinizin güvenliğini sağlamak için gerekli teknik ve idari tedbirleri
                     almaktadır.
                   </p>
                 </section>
