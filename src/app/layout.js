@@ -8,32 +8,31 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   metadataBase: new URL('https://cekgetir.com'),
-  title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
-  description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Birçok ünlü rapçinin jüri olduğu yarışmaya sen de katıl!',
+  title: 'Çekgetir | 7/24 Yol Yardım ve Çekici Hizmetleri',
+  description: 'Çekgetir, İstanbul ve Türkiye genelinde 7/24 yol yardım, çekici hizmeti, lastik değişimi ve araç kurtarma hizmetleri sunmaktadır.',
   keywords: [
-    'rap yarışması', 
-    'cekgetir', 
-    'türkçe rap',
-    'freestyle',
-    'hiphop yarışması',
-    'rap battle',
-    'türkçe freestyle',
-    'rap şampiyonası',
-    'rap turnuvası',
-    'underground rap',
-    'rap yetenek yarışması'
+    'yol yardım', 
+    'çekici hizmeti', 
+    'araç kurtarma',
+    'lastik değişimi',
+    'akü takviye',
+    '7/24 çekici',
+    'istanbul çekici',
+    'acil yol yardım',
+    'araç taşıma',
+    'şehirler arası çekici'
   ].join(', '),
   openGraph: {
-    title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
-    description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
+    title: 'Çekgetir | 7/24 Yol Yardım ve Çekici Hizmetleri',
+    description: 'Çekgetir, İstanbul ve Türkiye genelinde 7/24 yol yardım, çekici hizmeti, lastik değişimi ve araç kurtarma hizmetleri sunmaktadır.',
     url: 'https://cekgetir.com',
-    siteName: 'cekgetir',
+    siteName: 'Çekgetir',
     images: [
       {
         url: '/images/cekgetir.webp',
         width: 1200,
         height: 630,
-        alt: 'cekgetir Rap Yarışması',
+        alt: 'Çekgetir Yol Yardım ve Çekici Hizmetleri',
       },
     ],
     locale: 'tr_TR',
@@ -41,8 +40,8 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'cekgetir | Türkiye\'nin En Büyük Rap Yarışması',
-    description: 'cekgetir, Türkiye\'nin en prestijli rap yarışması. Ünlü rapçilerin jüri olduğu yarışmaya sen de katıl!',
+    title: 'Çekgetir | 7/24 Yol Yardım ve Çekici Hizmetleri',
+    description: 'Çekgetir, İstanbul ve Türkiye genelinde 7/24 yol yardım, çekici hizmeti, lastik değişimi ve araç kurtarma hizmetleri sunmaktadır.',
     images: ['/images/cekgetir.webp'],
   },
   robots: {
@@ -62,8 +61,8 @@ export const metadata = {
   alternates: {
     canonical: 'https://cekgetir.com',
   },
-  authors: [{ name: 'cekgetir Team' }],
-  category: 'Müzik',
+  authors: [{ name: 'Çekgetir Ekibi' }],
+  category: 'Otomotiv Hizmetleri',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',

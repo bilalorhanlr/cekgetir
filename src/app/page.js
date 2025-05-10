@@ -4,8 +4,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import Image from 'next/image'
 import { useEffect, useState, useRef } from 'react'
-import Script from 'next/script'
-import ContractModal from '@/components/ContractModal'
+import axios from 'axios'
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -280,77 +279,107 @@ export default function Home() {
     loadGoogleMaps()
   }, [])
 
-  // Harita başlatma fonksiyonu
+  // Harita ve konum işlemleri
+  const handleLocationSelect = (place, field) => {
+    const location = {
+      address: place.formatted_address,
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng()
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      [field === 'from' ? 'fromLocation' : 'toLocation']: location.address,
+      [field === 'from' ? 'fromLat' : 'toLat']: location.lat,
+      [field === 'from' ? 'fromLng' : 'toLng']: location.lng
+    }))
+
+    if (map && markerRef.current) {
+      markerRef.current.setPosition({ lat: location.lat, lng: location.lng })
+      map.panTo({ lat: location.lat, lng: location.lng })
+    }
+
+    setShowMap(false)
+  }
+
   const initMap = () => {
     if (!window.google || !mapRef.current) return
 
-    const mapInstance = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 41.0082, lng: 28.9784 }, // İstanbul merkezi
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: 41.0082, lng: 28.9784 },
       zoom: 12,
-      mapId: 'YOUR_MAP_ID', // Opsiyonel, koyu tema için
       styles: [
         {
-          featureType: "all",
-          elementType: "labels.text.fill",
-          stylers: [{ color: "#ffffff" }]
-        },
-        {
-          featureType: "all",
-          elementType: "labels.text.stroke",
-          stylers: [{ color: "#000000" }]
-        },
-        {
-          featureType: "road",
-          elementType: "geometry",
-          stylers: [{ color: "#38414e" }]
-        },
-        {
-          featureType: "road",
-          elementType: "geometry.stroke",
-          stylers: [{ color: "#212a37" }]
-        },
-        {
-          featureType: "road",
-          elementType: "labels.text.fill",
-          stylers: [{ color: "#9ca5b3" }]
-        },
-        {
-          featureType: "road.highway",
-          elementType: "geometry",
-          stylers: [{ color: "#746855" }]
-        },
-        {
-          featureType: "road.highway",
-          elementType: "geometry.stroke",
-          stylers: [{ color: "#1f2835" }]
-        },
-        {
-          featureType: "road.highway",
-          elementType: "labels.text.fill",
-          stylers: [{ color: "#f3d19c" }]
-        },
-        {
-          featureType: "water",
-          elementType: "geometry",
-          stylers: [{ color: "#17263c" }]
-        },
-        {
-          featureType: "water",
-          elementType: "labels.text.fill",
-          stylers: [{ color: "#515c6d" }]
-        },
-        {
-          featureType: "water",
-          elementType: "labels.text.stroke",
-          stylers: [{ color: "#17263c" }]
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }]
         }
       ]
     })
 
-    setMap(mapInstance)
+    const marker = new window.google.maps.Marker({
+      map: map,
+      draggable: true,
+      animation: window.google.maps.Animation.DROP
+    })
+
+    markerRef.current = marker
+
+    marker.addListener('dragend', () => {
+      const position = marker.getPosition()
+      const geocoder = new window.google.maps.Geocoder()
+
+      geocoder.geocode({ location: position }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          const address = results[0].formatted_address
+          setFormData(prev => ({
+            ...prev,
+            [activeLocationField === 'from' ? 'fromLocation' : 'toLocation']: address,
+            [activeLocationField === 'from' ? 'fromLat' : 'toLat']: position.lat(),
+            [activeLocationField === 'from' ? 'fromLng' : 'toLng']: position.lng()
+          }))
+        }
+      })
+    })
+
+    setMap(map)
   }
 
-  // Harita yüklendiğinde başlat
+  const calculateRoute = () => {
+    if (!window.google || !formData.fromLat || !formData.toLat) return
+
+    const directionsService = new window.google.maps.DirectionsService()
+    const renderer = new window.google.maps.DirectionsRenderer({
+      suppressMarkers: true
+    })
+
+    renderer.setMap(map)
+
+    directionsService.route(
+      {
+        origin: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) },
+        destination: { lat: parseFloat(formData.toLat), lng: parseFloat(formData.toLng) },
+        travelMode: window.google.maps.TravelMode.DRIVING
+      },
+      (result, status) => {
+        if (status === 'OK') {
+          renderer.setDirections(result)
+          setDirectionsRenderer(renderer)
+
+          const route = result.routes[0]
+          const distance = route.legs[0].distance.value / 1000 // km cinsinden
+          const duration = route.legs[0].duration.value / 60 // dakika cinsinden
+
+          setRouteInfo({
+            distance,
+            duration
+          })
+        }
+      }
+    )
+  }
+
+  // Harita başlatma fonksiyonu
   useEffect(() => {
     if (isGoogleLoaded && !map && mapRef.current) {
       initMap()
@@ -543,34 +572,6 @@ export default function Home() {
     }
   }
 
-  const calculateRoute = async () => {
-    if (!window.google || !formData.fromLat || !formData.toLat) return
-
-    const directionsService = new window.google.maps.DirectionsService()
-    const directionsRenderer = new window.google.maps.DirectionsRenderer()
-
-    const request = {
-      origin: new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
-      destination: new window.google.maps.LatLng(formData.toLat, formData.toLng),
-      travelMode: 'DRIVING'
-    }
-
-    try {
-      const result = await directionsService.route(request)
-      directionsRenderer.setDirections(result)
-      
-      const route = result.routes[0].legs[0]
-      setRouteInfo({
-        distance: route.distance.text,
-        duration: route.duration.text,
-        startAddress: route.start_address,
-        endAddress: route.end_address
-      })
-    } catch (error) {
-      console.error('Rota hesaplama hatası:', error)
-    }
-  }
-
   const handlePriceModalClose = () => {
     setShowPriceModal(false)
     setShowPrice(false)
@@ -656,7 +657,7 @@ export default function Home() {
       // Rota detaylarını hazırla
       let routeDetails = {
         distance: result.routes[0].legs[0].distance.value / 1000,
-        duration: result.routes[0].legs[0].duration.text,
+        duration: result.routes[0].legs[0].duration.value / 60, // dakika cinsinden
         usedRoutes: {
           bridges: usedBridges,
         },
@@ -687,412 +688,33 @@ export default function Home() {
     }
   };
 
-  const calculatePrice = async () => {
-    if (!formData.fromLat || !formData.fromLng) return;
+  const calculatePrice = () => {
+    if (!selectedVehicle || !selectedService || !routeInfo) return null
 
-    // Ataşehir merkez koordinatları - Ferhatpaşa, Anadolu Cd. No:74, 34888 Ataşehir/İstanbul
-    const atasehirLocation = {
-      lat: 40.9782,
-      lng: 29.1271
-    };
+    const basePrice = selectedVehicle.basePrice
+    const serviceMultiplier = selectedService.priceMultiplier
+    const distancePrice = routeInfo.distance * selectedVehicle.pricePerKm
 
-    let distance;
-    let isIntercity = false;
-    let fromCity = '';
-    let toCity = '';
-    
-    try {
-      if (formData.service === 'yol-yardim' || formData.service === 'lastik') {
-        // Yol yardım ve lastik için Ataşehir'den müşterinin konumuna olan mesafe
-        distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-          new window.google.maps.LatLng(atasehirLocation.lat, atasehirLocation.lng),
-          new window.google.maps.LatLng(formData.fromLat, formData.fromLng)
-        ) / 1000; // km cinsinden
+    return (basePrice + distancePrice) * serviceMultiplier
+  }
 
-        console.log('Yol Yardım/Lastik Mesafe:', distance.toFixed(2), 'km');
-
-        fromCity = 'İstanbul';
-        const geocoder = new window.google.maps.Geocoder();
-        const response = await geocoder.geocode({
-          location: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) }
-        });
-        
-        if (response.results[0]) {
-          const addressComponents = response.results[0].address_components;
-          const cityComponent = addressComponents.find(
-            component => component.types.includes('administrative_area_level_1')
-          );
-          toCity = cityComponent ? cityComponent.long_name : 'Bilinmiyor';
-          
-          // Yol yardım ve lastik için sadece İstanbul içi kontrolü
-          if (toCity !== 'İstanbul') {
-            alert('Yol yardım ve lastik hizmetlerimiz şu anda sadece İstanbul içinde sunulmaktadır.');
-            return;
-          }
-        }
-
-        // Temel fiyatlar
-        const basePrices = {
-          'yol-yardim': 1500, // Sadece İstanbul içi
-          'lastik': 1500, // Sadece İstanbul içi
-        };
-
-        // Mesafe katsayısı (km başına)
-        const distanceMultiplier = {
-          'yol-yardim': 15, // Sadece İstanbul içi
-          'lastik': 15, // Sadece İstanbul içi
-        };
-
-        // Ücret hesaplama
-        const basePrice = basePrices[formData.service] || 0;
-        const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
-        const totalPrice = basePrice + distancePrice;
-
-        console.log('Fiyat Hesaplama Detayları:', {
-          basePrice,
-          distancePrice,
-          distance: distance.toFixed(2),
-          totalPrice: Math.round(totalPrice),
-          kdv: Math.round(totalPrice * 0.20),
-          totalWithKdv: Math.round(totalPrice * 1.20)
-        });
-
-        setCalculatedPrice({
-          basePrice,
-          distancePrice,
-          bridgeFee: 0,
-          distance: distance.toFixed(1),
-          totalPrice: Math.round(totalPrice),
-          vehicleCount: 1,
-          vehicleCountMultiplier: 1,
-          parkingMultiplier: 1,
-          isIntercity: false,
-          fromCity: 'İstanbul',
-          toCity: toCity,
-          duration: 'Hesaplanıyor...',
-          usedRoutes: {
-            bridges: []
-          }
-        });
-
-        setShowPrice(true);
-        setShowPriceModal(true);
-
-        if (priceMapRef.current) {
-          setTimeout(() => {
-            drawRoute();
-          }, 100);
-        }
-        return;
-      }
-
-      // Çekici hizmetleri için başlangıç ve varış noktası arası mesafe
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      // İstanbul'daki köprülerin koordinatları
-      const bridges = [
-        {
-          name: "15 Temmuz Şehitler Köprüsü",
-          location: { lat: 41.0451, lng: 29.0355 },
-          radius: 1000,
-          keywords: ["15 temmuz", "boğaziçi köprüsü", "şehitler köprüsü"]
-        },
-        {
-          name: "FSM Köprüsü",
-          location: { lat: 41.0904, lng: 29.0560 },
-          radius: 1000,
-          keywords: ["fsm", "fatih sultan mehmet", "2. köprü", "ikinci köprü"]
-        },
-        {
-          name: "Yavuz Sultan Selim Köprüsü",
-          location: { lat: 41.2008, lng: 29.1182 },
-          radius: 1000,
-          keywords: ["yavuz sultan selim", "3. köprü", "üçüncü köprü"]
-        }
-      ];
-
-      try {
-        // Direkt rota hesapla
-        const result = await directionsService.route({
-          origin: new window.google.maps.LatLng(formData.fromLat, formData.fromLng),
-          destination: new window.google.maps.LatLng(formData.toLat, formData.toLng),
-          travelMode: window.google.maps.TravelMode.DRIVING,
-          avoidHighways: false,
-          avoidTolls: false
-        });
-
-        // Kullanılan köprüleri tespit et
-        const usedBridges = [];
-        const path = result.routes[0].overview_path;
-        const routeSteps = result.routes[0].legs[0].steps;
-
-        // Köprü tespiti için tüm noktaları kontrol et
-        for (let i = 0; i < path.length; i++) {
-          const point = path[i];
-          bridges?.forEach(bridge => {
-            const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-              point,
-              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
-            );
-            if (distance < bridge.radius) {
-              if (!usedBridges.includes(bridge.name)) {
-                usedBridges.push(bridge.name);
-                console.log(`Köprü tespit edildi (konum): ${bridge.name} - Mesafe: ${distance.toFixed(2)} metre`);
-              }
-            }
-          });
-        }
-
-        // Adım adım talimatları kontrol et
-        for (const step of routeSteps) {
-          const instructions = step.instructions?.toLowerCase() || '';
-          const startPoint = step.start_location;
-          const endPoint = step.end_location;
-
-          bridges?.forEach(bridge => {
-            // Talimatları kontrol et
-            const hasKeyword = bridge.keywords?.some(keyword => instructions.includes(keyword.toLowerCase())) || false;
-            if (hasKeyword && !usedBridges.includes(bridge.name)) {
-              usedBridges.push(bridge.name);
-              console.log(`Köprü tespit edildi (talimat): ${bridge.name} - Talimat: ${instructions}`);
-            }
-
-            // Başlangıç ve bitiş noktalarını kontrol et
-            const startDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
-              startPoint,
-              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
-            );
-            const endDistance = window.google.maps.geometry.spherical.computeDistanceBetween(
-              endPoint,
-              new window.google.maps.LatLng(bridge.location.lat, bridge.location.lng)
-            );
-
-            if ((startDistance < bridge.radius || endDistance < bridge.radius) && !usedBridges.includes(bridge.name)) {
-              usedBridges.push(bridge.name);
-              console.log(`Köprü tespit edildi (adım): ${bridge.name} - Başlangıç mesafesi: ${startDistance.toFixed(2)}m, Bitiş mesafesi: ${endDistance.toFixed(2)}m`);
-            }
-          });
-        }
-
-        console.log('Tespit edilen köprüler:', usedBridges);
-
-        // Rota detaylarını hazırla
-        let routeDetails = {
-          distance: result.routes[0].legs[0].distance.value / 1000,
-          duration: result.routes[0].legs[0].duration.text,
-          usedRoutes: {
-            bridges: usedBridges,
-          },
-          bridgeFee: usedBridges.reduce((total, bridge) => {
-            // Köprü ücretleri
-            const bridgeFees = {
-              'FSM Köprüsü': 100,
-              'Yavuz Sultan Selim Köprüsü': 500,
-              '15 Temmuz Şehitler Köprüsü': 400,
-              'Osmangazi Köprüsü': 1000,
-              'Çanakkale Köprüsü': 1000
-            };
-            return total + (bridgeFees[bridge] || 0); // Bilinmeyen köprüler için varsayılan 150 TL
-          }, 0)
-        };
-
-        // Otoyol kontrolü kaldırıldı
-
-        console.log('Rota Detayları:', {
-          totalDistance: routeDetails.distance.toFixed(2) + ' km',
-          totalDuration: routeDetails.duration,
-          usedBridges: routeDetails.usedRoutes.bridges,
-          bridgeFee: routeDetails.bridgeFee + ' TL',
-          pathPoints: path.length,
-          startPoint: {
-            lat: formData.fromLat,
-            lng: formData.fromLng
-          },
-          endPoint: {
-            lat: formData.toLat,
-            lng: formData.toLng
-          }
-        });
-
-        distance = routeDetails.distance;
-
-        console.log('Çekici Hizmeti Mesafe:', distance.toFixed(2), 'km');
-        console.log('Kullanılan Köprüler:', routeDetails.usedRoutes.bridges);
-        console.log('Köprü Ücreti:', routeDetails.bridgeFee, 'TL');
-        console.log('Kullanılan Otoyollar:', routeDetails.usedRoutes.highways);
-
-        // Şehir kontrolü
-        const geocoder = new window.google.maps.Geocoder();
-        const [fromResponse, toResponse] = await Promise.all([
-          geocoder.geocode({
-            location: { lat: parseFloat(formData.fromLat), lng: parseFloat(formData.fromLng) }
-          }),
-          geocoder.geocode({
-            location: { lat: parseFloat(formData.toLat), lng: parseFloat(formData.toLng) }
-          })
-        ]);
-
-        if (fromResponse.results[0] && toResponse.results[0]) {
-          const fromComponents = fromResponse.results[0].address_components;
-          const toComponents = toResponse.results[0].address_components;
-          
-          const fromCityComponent = fromComponents.find(
-            component => component.types.includes('administrative_area_level_1')
-          );
-          const toCityComponent = toComponents.find(
-            component => component.types.includes('administrative_area_level_1')
-          );
-
-          fromCity = fromCityComponent ? fromCityComponent.long_name : 'Bilinmiyor';
-          toCity = toCityComponent ? toCityComponent.long_name : 'Bilinmiyor';
-          
-          console.log('Şehir Bilgileri:', {
-            fromCity,
-            toCity,
-            isIntercity: fromCity !== toCity
-          });
-          
-          // İstanbul içi kontrolü
-          if (fromCity === 'İstanbul' && toCity === 'İstanbul') {
-            isIntercity = false;
-          } else {
-            isIntercity = true;
-          }
-        }
-
-        // Mesafe 50km'den fazlaysa şehirler arası kabul et
-        if (distance > 50) {
-          isIntercity = true;
-        }
-
-        // Temel fiyatlar
-        const basePrices = {
-          'yol-yardim': 1500, // Sadece İstanbul içi
-          'lastik': 1500, // Sadece İstanbul içi
-          'cekici': isIntercity ? 2000 : 1500,
-          'coklu-cekici': isIntercity ? 2000 : 1500
-        };
-
-        // Mesafe katsayısı (km başına)
-        const distanceMultiplier = {
-          'yol-yardim': 15, // Sadece İstanbul içi
-          'lastik': 15, // Sadece İstanbul içi
-          'cekici': isIntercity ? 25 : 35,
-          'coklu-cekici': isIntercity ? 45 : 55
-        };
-
-        // Araç durumuna göre ek ücretler
-        const conditionFees = {
-          'arızalı': 200,
-          'vites_p': 300,
-          'kazalı': 300,
-          'yakıt_bitti': 100,
-          'akü': 100
-        };
-
-        // Çoklu çekici için toplam ek ücret hesaplama
-        let totalConditionFee = 0;
-        if (formData.service === 'coklu-cekici') {
-          multiVehicleData.forEach(vehicle => {
-            if (vehicle.condition && conditionFees[vehicle.condition]) {
-              totalConditionFee += conditionFees[vehicle.condition];
-            }
-          });
-        } else {
-          // Tekli çekici için ek ücret hesaplama
-          if (formData.vehicleCondition && conditionFees[formData.vehicleCondition]) {
-            totalConditionFee = conditionFees[formData.vehicleCondition];
-          }
-        }
-
-        // Araç tipine göre çarpanlar
-        const vehicleTypeMultipliers = {
-          'Sedan': 1.0,
-          'Hatchback': 1.0,
-          'Station Wagon': 1.1,
-          'SUV': 1.2,
-          'Pick-up': 1.3,
-          'Van': 1.3,
-          'Minibüs': 1.4,
-          'Kamyonet': 1.5,
-          'Çekici': 1.6,
-          'Çoklu Çekici': 1.7,
-          'Dorse': 1.8,
-          'İş Makinesi': 2.0,
-          'Kamyon': 2.0,
-          'Otobüs': 2.2,
-          'Yarım Otobüs': 2.0,
-          'Tanker': 2.2,
-          'Romorkör': 2.0
-        };
-
-        // Ücret hesaplama
-        const basePrice = basePrices[formData.service] || 0;
-        const distancePrice = distance * (distanceMultiplier[formData.service] || 0);
-        const vehicleCountMultiplier = formData.service === 'coklu-cekici' ? 
-          (vehicleCount > 1 ? 1 + (vehicleCount - 1) * 0.5 : 1) : 1;
-        const parkingMultiplier = isParkingDelivery ? 1.2 : 1;
-        const bridgeFee = routeDetails.bridgeFee || 0;
-        const vehicleTypeMultiplier = formData.service === 'coklu-cekici' ? 
-          Math.max(...multiVehicleData.map(vehicle => vehicleTypeMultipliers[vehicle.type] || 1)) :
-          vehicleTypeMultipliers[formData.vehicleType] || 1;
-        const totalPrice = (basePrice + distancePrice + bridgeFee + totalConditionFee) * 
-          vehicleCountMultiplier * parkingMultiplier * vehicleTypeMultiplier;
-
-        console.log('Fiyat Hesaplama Detayları:', {
-          basePrice,
-          distancePrice,
-          bridgeFee,
-          conditionFee: totalConditionFee,
-          distance: distance.toFixed(2),
-          vehicleCount,
-          vehicleCountMultiplier,
-          parkingMultiplier,
-          vehicleTypeMultiplier,
-          isIntercity,
-          fromCity,
-          toCity,
-          totalPrice: Math.round(totalPrice),
-          kdv: Math.round(totalPrice * 0.20),
-          totalWithKdv: Math.round(totalPrice * 1.20)
-        });
-
-        setCalculatedPrice({
-          basePrice,
-          distancePrice,
-          bridgeFee: routeDetails.bridgeFee,
-          conditionFee: totalConditionFee,
-          distance: distance.toFixed(1),
-          totalPrice: Math.round(totalPrice),
-          vehicleCount,
-          vehicleCountMultiplier,
-          parkingMultiplier,
-          vehicleTypeMultiplier,
-          isIntercity,
-          fromCity,
-          toCity,
-          duration: routeDetails.duration,
-          usedRoutes: routeDetails.usedRoutes
-        });
-
-        setShowPrice(true);
-        setShowPriceModal(true);
-
-        if (priceMapRef.current) {
-          setTimeout(() => {
-            drawRoute();
-          }, 100);
-        }
-      } catch (error) {
-        console.error('Rota hesaplama hatası:', error);
-        alert('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
-        throw error;
-      }
-    } catch (error) {
-      console.error('Fiyat hesaplama hatası:', error);
-      alert('Fiyat hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+  // UI güncellemeleri
+  useEffect(() => {
+    if (mounted && window.google) {
+      initMap()
     }
-  };
+  }, [mounted])
+
+  useEffect(() => {
+    if (formData.fromLat && formData.toLat) {
+      calculateRoute()
+    }
+  }, [formData.fromLat, formData.toLat])
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   const handleModalClose = () => {
     setShowModal(false)
@@ -1437,6 +1059,47 @@ export default function Home() {
       throw error;
     }
   };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://localhost:4000/api/auth/login', 
+        { username, password },
+        { 
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      // ... existing code ...
+    } catch (error) {
+      console.error('Login Error:', error);
+    }
+  };
+
+  const fetchVariables = async () => {
+    try {
+      const response = await axios.get('http://localhost:4000/api/admin/variables', {
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      setVariables(response.data);
+    } catch (error) {
+      console.error('Error fetching variables:', error);
+      if (error.response) {
+        // Server responded with an error
+        console.error('Server error:', error.response.data);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchVariables();
+  }, []);
 
   if (!mounted) {
     return null
