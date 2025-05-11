@@ -1,0 +1,43 @@
+{
+    "aracMarkalari": [
+      "BMW",
+      "Mercedes",
+      "Audi",
+      "Volkswagen",
+      "Toyota",
+      "Honda",
+      "Ford",
+      "Renault",
+      "Fiat",
+      "Hyundai"
+    ],
+    "aracModelleri": {
+      "BMW": ["3 Serisi", "5 Serisi", "7 Serisi", "X3", "X5"],
+      "Mercedes": ["A Serisi", "C Serisi", "E Serisi", "S Serisi", "GLC"],
+      "Audi": ["A3", "A4", "A6", "Q3", "Q5"],
+      "Volkswagen": ["Golf", "Passat", "Polo", "Tiguan", "T-Roc"],
+      "Toyota": ["Corolla", "Camry", "RAV4", "Yaris", "Hilux"],
+      "Honda": ["Civic", "Accord", "CR-V", "Jazz", "City"],
+      "Ford": ["Focus", "Fiesta", "Mustang", "Explorer", "Ranger"],
+      "Renault": ["Clio", "Megane", "Captur", "Kadjar", "Twingo"],
+      "Fiat": ["500", "Punto", "Tipo", "Doblo", "Egea"],
+      "Hyundai": ["i20", "i30", "Tucson", "Santa Fe", "Elantra"]
+    },
+    "yillar": [2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010, 2009, 2008, 2007, 2006, 2005, 2004, 2003, 2002, 2001, 2000, 1999, 1998, 1997, 1996, 1995],
+    "segmentler": [
+      { "id": "sedan", "title": "Sedan" },
+      { "id": "hatchback", "title": "Hatchback" },
+      { "id": "station", "title": "Station" },
+      { "id": "suv", "title": "SUV" },
+      { "id": "minivan", "title": "Minivan" },
+      { "id": "van", "title": "Van" },
+      { "id": "pickup", "title": "Pickup" }
+    ],
+    "arizaTipleri": [
+        { "id": "aku", "title": "Akü Takviyesi" },
+        { "id": "lastik", "title": "Lastik Değişimi" },
+        { "id": "benzin", "title": "Yakıt İkmali" },
+        { "id": "motor", "title": "Motor Arızası" },
+        { "id": "diger", "title": "Diğer" }
+    ]
+}
