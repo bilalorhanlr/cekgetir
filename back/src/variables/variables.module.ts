@@ -4,13 +4,13 @@ import { VariablesController } from './variables.controller';
 import { VariablesService } from './variables.service';
 import { 
   SegmentKatsayilari,
-  MerkezKonum,
-  AracDurumu,
-  OtoparkKonumlari,
-  KmUcretleri,
-  AracAdediCarpani,
+  YolYardimDegerleri,
+  TopluCekiciDegerleri,
+  OtoparkKonum,
+  AralikUcretleri,
+  AracAdetCarpani,
   IlOzelCekiciUcretleri,
-  GenelAyarlar
+  IlExtraCekiciUcretleri,
 } from './variables.entity';
 import { JwtAuthModule } from '../auth/jwt.module';
 
@@ -18,13 +18,13 @@ import { JwtAuthModule } from '../auth/jwt.module';
   imports: [
     TypeOrmModule.forFeature([
       SegmentKatsayilari,
-      MerkezKonum,
-      AracDurumu,
-      OtoparkKonumlari,
-      KmUcretleri,
-      AracAdediCarpani,
+      YolYardimDegerleri,
+      TopluCekiciDegerleri,
+      OtoparkKonum,
+      AralikUcretleri,
+      AracAdetCarpani,
       IlOzelCekiciUcretleri,
-      GenelAyarlar
+      IlExtraCekiciUcretleri,
     ]),
     JwtAuthModule
   ],

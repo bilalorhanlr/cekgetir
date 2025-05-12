@@ -2,168 +2,187 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { 
-  SegmentKatsayilari,
-  MerkezKonum,
-  AracDurumu,
-  OtoparkKonumlari,
-  KmUcretleri,
-  AracAdediCarpani,
+  YolYardimDegerleri,
+  TopluCekiciDegerleri,
+  OtoparkKonum,
+  AralikUcretleri,
+  AracAdetCarpani,
   IlOzelCekiciUcretleri,
-  GenelAyarlar
+  IlExtraCekiciUcretleri,
+  SegmentKatsayilari,
+  KmBasiUcret
 } from './variables.entity';
 
 @Injectable()
 export class VariablesService {
   constructor(
-    @InjectRepository(SegmentKatsayilari)
-    private segmentKatsayilariRepository: Repository<SegmentKatsayilari>,
-    @InjectRepository(MerkezKonum)
-    private merkezKonumRepository: Repository<MerkezKonum>,
-    @InjectRepository(AracDurumu)
-    private aracDurumuRepository: Repository<AracDurumu>,
-    @InjectRepository(OtoparkKonumlari)
-    private otoparkKonumlariRepository: Repository<OtoparkKonumlari>,
-    @InjectRepository(KmUcretleri)
-    private kmUcretleriRepository: Repository<KmUcretleri>,
-    @InjectRepository(AracAdediCarpani)
-    private aracAdediCarpaniRepository: Repository<AracAdediCarpani>,
+    @InjectRepository(YolYardimDegerleri)
+    private yolYardimDegerleriRepository: Repository<YolYardimDegerleri>,
+    @InjectRepository(TopluCekiciDegerleri)
+    private topluCekiciDegerleriRepository: Repository<TopluCekiciDegerleri>,
+    @InjectRepository(OtoparkKonum)
+    private otoparkKonumRepository: Repository<OtoparkKonum>,
+    @InjectRepository(AralikUcretleri)
+    private aralikUcretleriRepository: Repository<AralikUcretleri>,
+    @InjectRepository(AracAdetCarpani)
+    private aracAdetCarpaniRepository: Repository<AracAdetCarpani>,
     @InjectRepository(IlOzelCekiciUcretleri)
     private ilOzelCekiciUcretleriRepository: Repository<IlOzelCekiciUcretleri>,
-    @InjectRepository(GenelAyarlar)
-    private genelAyarlarRepository: Repository<GenelAyarlar>,
+    @InjectRepository(IlExtraCekiciUcretleri)
+    private ilExtraCekiciUcretleriRepository: Repository<IlExtraCekiciUcretleri>,
+    @InjectRepository(SegmentKatsayilari)
+    private segmentKatsayilariRepository: Repository<SegmentKatsayilari>,
+    @InjectRepository(KmBasiUcret)
+    private kmBasiUcretleriRepository: Repository<KmBasiUcret>,
   ) {}
 
-  // Segment Katsayıları
-  async findAllSegmentKatsayilari() {
-    return await this.segmentKatsayilariRepository.find();
+
+
+  private async yolYardimDegerleri() {
+    const yolYardimDegerleri = await this.yolYardimDegerleriRepository.findOne({ where: { id: 1 } });
+    if (!yolYardimDegerleri && !yolYardimDegerleri.segmentKatsayilari) {
+
+      const newYolYardimDegerleri = new YolYardimDegerleri();
+      newYolYardimDegerleri.id = 1;
+      newYolYardimDegerleri.baseUcret = 0;
+      newYolYardimDegerleri.kmBasiUcret = 0;
+      newYolYardimDegerleri.segmentKatsayilari = []; // önemli!
+      await this.yolYardimDegerleriRepository.save(newYolYardimDegerleri);
+      // segment katsayilari
+      // sedan, hatcback, coupe , cabrio, suv, minivan, motorsiklet, station wagon, pickup, ticari
+      // 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+
+      let segmentKatsayilari = [
+        { segment: 'sedan', katsayi: 1 },
+        { segment: 'hactback', katsayi: 1 },
+        { segment: 'coupe', katsayi: 1 },
+        { segment: 'cabrio', katsayi: 1 },
+        { segment: 'suv', katsayi: 1 },
+        { segment: 'minivan', katsayi: 1 },
+        { segment: 'motorsiklet', katsayi: 1 },
+        { segment: 'station wagon', katsayi: 1 },
+        { segment: 'pickup', katsayi: 1 },
+        { segment: 'ticari', katsayi: 1 },
+      ];
+
+      for (let segmentKatsayilari2 of segmentKatsayilari) {
+        const newSegmentKatsayilari = new SegmentKatsayilari();
+        newSegmentKatsayilari.segment = segmentKatsayilari2.segment;
+        newSegmentKatsayilari.katsayi = segmentKatsayilari2.katsayi;
+        newSegmentKatsayilari.yolYardimDegerleri = newYolYardimDegerleri;
+        await this.segmentKatsayilariRepository.save(newSegmentKatsayilari);
+      }
+    }
+
   }
 
-  async createSegmentKatsayilari(createDto: Partial<SegmentKatsayilari>) {
-    const segment = this.segmentKatsayilariRepository.create(createDto);
-    return await this.segmentKatsayilariRepository.save(segment);
+  private async setupTopluCekiciDegerleri() {
+    const topluCekiciDegerleri = await this.topluCekiciDegerleriRepository.findOne({ where: { id: 1 } });
+    if (!topluCekiciDegerleri) {
+      const newTopluCekiciDegerleri = new TopluCekiciDegerleri();
+      newTopluCekiciDegerleri.baseUcret = 0;
+      await this.topluCekiciDegerleriRepository.save(newTopluCekiciDegerleri);
+
+
+      let segmentKatsayilari = [
+        { segment: 'sedan', katsayi: 1 },
+        { segment: 'hactback', katsayi: 1 },
+        { segment: 'coupe', katsayi: 1 },
+        { segment: 'cabrio', katsayi: 1 },
+        { segment: 'suv', katsayi: 1 },
+        { segment: 'minivan', katsayi: 1 },
+        { segment: 'motorsiklet', katsayi: 1 },
+        { segment: 'station wagon', katsayi: 1 },
+        { segment: 'pickup', katsayi: 1 },
+        { segment: 'ticari', katsayi: 1 },
+      ];
+
+      for (let segmentKatsayilari2 of segmentKatsayilari) {
+        const newSegmentKatsayilari = new SegmentKatsayilari();
+        newSegmentKatsayilari.segment = segmentKatsayilari2.segment;
+        newSegmentKatsayilari.katsayi = segmentKatsayilari2.katsayi;
+        newSegmentKatsayilari.topluCekiciDegerleri = newTopluCekiciDegerleri;
+        await this.segmentKatsayilariRepository.save(newSegmentKatsayilari);
+      }
+
+      let ilOzelCekiciUcretleri = [
+        { il: 'ankara', price: 0 },
+        { il: 'istanbul', price: 0 },
+        { il: 'izmir', price: 0 },
+        { il: 'bursa', price: 0 },
+        { il: 'adana', price: 0 },
+      ];
+
+      let ilExtraCekiciUcretleri = [
+        { il: 'ankara', price: 0 },
+        { il: 'istanbul', price: 0 },
+        { il: 'izmir', price: 0 },
+        { il: 'bursa', price: 0 },
+        { il: 'adana', price: 0 },
+      ];
+      let kmBasiUcretleri = [
+        { il: 'ankara', price: 0 },
+        { il: 'istanbul', price: 0 },
+        { il: 'izmir', price: 0 },
+        { il: 'bursa', price: 0 },
+        { il: 'adana', price: 0 },
+      ];
+
+      for (let ilOzelCekiciUcretleri2 of ilOzelCekiciUcretleri) {
+        const newIlOzelCekiciUcretleri = new IlOzelCekiciUcretleri();
+        newIlOzelCekiciUcretleri.il = ilOzelCekiciUcretleri2.il;
+        newIlOzelCekiciUcretleri.price = ilOzelCekiciUcretleri2.price;
+        newIlOzelCekiciUcretleri.topluCekiciDegerleri = newTopluCekiciDegerleri;
+        await this.ilOzelCekiciUcretleriRepository.save(newIlOzelCekiciUcretleri);
+      }
+
+      for (let ilExtraCekiciUcretleri2 of ilExtraCekiciUcretleri) {
+        const newIlExtraCekiciUcretleri = new IlExtraCekiciUcretleri();
+        newIlExtraCekiciUcretleri.il = ilExtraCekiciUcretleri2.il;
+        newIlExtraCekiciUcretleri.price = ilExtraCekiciUcretleri2.price;
+        newIlExtraCekiciUcretleri.topluCekiciDegerleri = newTopluCekiciDegerleri;
+        await this.ilExtraCekiciUcretleriRepository.save(newIlExtraCekiciUcretleri);
+      }
+
+      for (let kmBasiUcretleri2 of kmBasiUcretleri) {
+        const newKmBasiUcretleri = new KmBasiUcret();
+        newKmBasiUcretleri.il = kmBasiUcretleri2.il;
+        newKmBasiUcretleri.price = kmBasiUcretleri2.price;
+        newKmBasiUcretleri. = newKmBasiUcretleri;
+        await this.kmBasiUcretleriRepository.save(newKmBasiUcretleri);
+      } 
+    }
   }
 
-  async updateSegmentKatsayilari(id: number, updateDto: Partial<SegmentKatsayilari>) {
-    await this.segmentKatsayilariRepository.update(id, updateDto);
-    return await this.segmentKatsayilariRepository.findOne({ where: { id } });
+  private async setupOtoparkKonum() {
   }
 
-  async removeSegmentKatsayilari(id: number) {
-    await this.segmentKatsayilariRepository.delete(id);
+  private async setupAralikUcretleri() {
   }
 
-  // Merkez Konum
-  async getMerkezKonum() {
-    return await this.merkezKonumRepository.findOne({ where: { id: 1 } });
+  private async setupAracAdediCarpani() {
   }
 
-  async updateMerkezKonum(updateDto: Partial<MerkezKonum>) {
-    await this.merkezKonumRepository.update(1, updateDto);
-    return await this.getMerkezKonum();
+  private async setupIlOzelCekiciUcretleri() {
   }
 
-  // Araç Durumu
-  async findAllAracDurumu() {
-    return await this.aracDurumuRepository.find();
+  private async setupIlExtraCekiciUcretleri() {
   }
 
-  async createAracDurumu(createDto: Partial<AracDurumu>) {
-    const durum = this.aracDurumuRepository.create(createDto);
-    return await this.aracDurumuRepository.save(durum);
+  private async setupAracDurumu() {
   }
 
-  async updateAracDurumu(id: number, updateDto: Partial<AracDurumu>) {
-    await this.aracDurumuRepository.update(id, updateDto);
-    return await this.aracDurumuRepository.findOne({ where: { id } });
+  private async setupSegmentKatsayilari() {
   }
 
-  async removeAracDurumu(id: number) {
-    await this.aracDurumuRepository.delete(id);
+  private async setupMerkezKonum() {
   }
 
-  // Otopark Konumları
-  async findAllOtoparkKonumlari() {
-    return await this.otoparkKonumlariRepository.find();
+  // km ucretleri
+  private async setupKmUcretleri() {
   }
 
-  async createOtoparkKonumlari(createDto: Partial<OtoparkKonumlari>) {
-    const konum = this.otoparkKonumlariRepository.create(createDto);
-    return await this.otoparkKonumlariRepository.save(konum);
-  }
-
-  async updateOtoparkKonumlari(id: number, updateDto: Partial<OtoparkKonumlari>) {
-    await this.otoparkKonumlariRepository.update(id, updateDto);
-    return await this.otoparkKonumlariRepository.findOne({ where: { id } });
-  }
-
-  async removeOtoparkKonumlari(id: number) {
-    await this.otoparkKonumlariRepository.delete(id);
-  }
-
-  // KM Ücretleri
-  async findAllKmUcretleri() {
-    return await this.kmUcretleriRepository.find();
-  }
-
-  async createKmUcretleri(createDto: Partial<KmUcretleri>) {
-    const ucret = this.kmUcretleriRepository.create(createDto);
-    return await this.kmUcretleriRepository.save(ucret);
-  }
-
-  async updateKmUcretleri(id: number, updateDto: Partial<KmUcretleri>) {
-    await this.kmUcretleriRepository.update(id, updateDto);
-    return await this.kmUcretleriRepository.findOne({ where: { id } });
-  }
-
-  async removeKmUcretleri(id: number) {
-    await this.kmUcretleriRepository.delete(id);
-  }
-
-  // Araç Adedi Çarpanı
-  async findAllAracAdediCarpani() {
-    return await this.aracAdediCarpaniRepository.find();
-  }
-
-  async createAracAdediCarpani(createDto: Partial<AracAdediCarpani>) {
-    const carpan = this.aracAdediCarpaniRepository.create(createDto);
-    return await this.aracAdediCarpaniRepository.save(carpan);
-  }
-
-  async updateAracAdediCarpani(id: number, updateDto: Partial<AracAdediCarpani>) {
-    await this.aracAdediCarpaniRepository.update(id, updateDto);
-    return await this.aracAdediCarpaniRepository.findOne({ where: { id } });
-  }
-
-  async removeAracAdediCarpani(id: number) {
-    await this.aracAdediCarpaniRepository.delete(id);
-  }
-
-  // İl Özel Çekici Ücretleri
-  async findAllIlOzelCekiciUcretleri() {
-    return await this.ilOzelCekiciUcretleriRepository.find();
-  }
-
-  async createIlOzelCekiciUcretleri(createDto: Partial<IlOzelCekiciUcretleri>) {
-    const ucret = this.ilOzelCekiciUcretleriRepository.create(createDto);
-    return await this.ilOzelCekiciUcretleriRepository.save(ucret);
-  }
-
-  async updateIlOzelCekiciUcretleri(id: number, updateDto: Partial<IlOzelCekiciUcretleri>) {
-    await this.ilOzelCekiciUcretleriRepository.update(id, updateDto);
-    return await this.ilOzelCekiciUcretleriRepository.findOne({ where: { id } });
-  }
-
-  async removeIlOzelCekiciUcretleri(id: number) {
-    await this.ilOzelCekiciUcretleriRepository.delete(id);
-  }
-
-  // Genel Ayarlar
-  async getGenelAyarlar() {
-    return await this.genelAyarlarRepository.findOne({ where: { id: 1 } });
-  }
-
-  async updateGenelAyarlar(updateDto: Partial<GenelAyarlar>) {
-    await this.genelAyarlarRepository.update(1, updateDto);
-    return await this.getGenelAyarlar();
-  }
+  
+  
+  
 } 

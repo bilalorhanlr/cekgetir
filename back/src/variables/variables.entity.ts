@@ -1,226 +1,234 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, PrimaryColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, PrimaryColumn, OneToMany, OneToOne, JoinColumn, ManyToOne } from 'typeorm';
 
 
-@Entity('ortak_degerler')
-export class OrtakDegerler {
-  @PrimaryColumn('text')
-  carType: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  price: number;
 
-  }
-
-@Entity('variables')
-export class Variables {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  // Yol Yardım Değişkenleri
-  @OneToMany(() => OrtakDegerler, (ortakDegerler) => ortakDegerler.carType , { cascade: false })
-  ortakDegerler: OrtakDegerler[];
-
-  @Column('json')
-  merkezKonum: {
-    lat: number;
-    lng: number;
-  };
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  baseUcret: number;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  kmBasiUcret: number;
-
-  @Column('json')
-  aracDurumu: {
-    [key: string]: number;
-  };
-
-  // Özel Çekici Değişkenleri
-  @Column('decimal', { precision: 10, scale: 2 })
-  kopruGecisUcreti: number;
-
-  // Toplu Çekici Değişkenleri
-  @Column('json')
-  otoparkKonumlari: {
-    [key: string]: {
-      lat: number;
-      lng: number;
-    };
-  };
-
-  @Column('json')
-  kmUcretleri: {
-    '0-100': number;
-    '100-200': number;
-    '200-300': number;
-    [key: string]: number;
-  };
-
-  @Column('json')
-  aracAdediCarpani: {
-    [key: string]: number;
-  };
-
-  @Column('json')
-  ilOzelCekiciUcretleri: {
-    [key: string]: number;
-  };
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-
+// Ortak Değerler , Yol Yardım Değişkenleri, Toplu Çekici Değişkenler
 @Entity('segment_katsayilari')
 export class SegmentKatsayilari {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column()
+  @PrimaryColumn()
   segment: string;
 
-  @Column('text')
-  katsayi: string;
+  @Column('decimal', { precision: 10, scale: 2 })
+  katsayi: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @ManyToOne(() => YolYardimDegerleri, (yolYardimDegerleri) => yolYardimDegerleri.segmentKatsayilari)
+  @JoinColumn()
+  yolYardimDegerleri: YolYardimDegerleri;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.segmentKatsayilari)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
 }
 
-@Entity('merkez_konum')
-export class MerkezKonum {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column('text')
-  lat: string;
-
-  @Column('text')
-  lng: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-
-@Entity('arac_durumu')
+// Özel Çekici Değişkenleri
+// base ücret
+// km basi ücret 81 il
+// arac durumu
+// köprü geçiş ücreti
+@Entity("arac_durumu")
 export class AracDurumu {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column()
+  @PrimaryColumn()
   durum: string;
 
-  @Column('text')
-  katsayi: string;
+  @Column()
+  price: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @ManyToOne(() => OzelCekiciDegerleri, (ozelCekiciDegerleri) => ozelCekiciDegerleri.aracDurumu)
+  @JoinColumn()
+  ozelCekiciDegerleri: OzelCekiciDegerleri;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  // yol yardim degerleri
+  @ManyToOne(() => YolYardimDegerleri, (yolYardimDegerleri) => yolYardimDegerleri.aracDurumu)
+  @JoinColumn()
+  yolYardimDegerleri: YolYardimDegerleri;
+
+  // toplu cekici degerleri
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.aracDurumu)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
+
 }
 
-@Entity('otopark_konumlari')
-export class OtoparkKonumlari {
-  @PrimaryGeneratedColumn()
-  id: number;
 
-  @Column()
+@Entity("km_basucret")
+export class KmBasiUcret {
+  @PrimaryColumn()
   il: string;
 
-  @Column('text')
-  lat: string;
-
-  @Column('text')
-  lng: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-
-@Entity('km_ucretleri')
-export class KmUcretleri {
-  @PrimaryGeneratedColumn()
-  id: number;
-
   @Column()
-  aralik: string;
+  price: number;
 
-  @Column('text')
-  ucret: string;
+  @ManyToOne(() => OzelCekiciDegerleri, (ozelCekiciDegerleri) => ozelCekiciDegerleri.kmBasiUcretleri)
+  @JoinColumn()
+  ozelCekiciDegerleri: OzelCekiciDegerleri;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-
-@Entity('arac_adedi_carpani')
-export class AracAdediCarpani {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column()
-  adet: string;
-
-  @Column('text')
-  carpan: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+  
 }
 
 @Entity('il_ozel_cekici_ucretleri')
 export class IlOzelCekiciUcretleri {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column()
+  @PrimaryColumn()
   il: string;
 
-  @Column('text')
-  ucret: string;
+  @Column()
+  price: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.ilOzelCekiciUcretleri)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
 }
 
-@Entity('genel_ayarlar')
-export class GenelAyarlar {
+@Entity('il_extra_cekici_ucretleri')
+export class IlExtraCekiciUcretleri {
+  @PrimaryColumn()
+  il: string;
+
+  @Column()
+  price: number;
+
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.ilExtraCekiciUcretleri)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
+}
+
+
+@Entity("arac_adet_carpani")
+export class AracAdetCarpani {
+  @PrimaryColumn()
+  carCount: number;
+  
+  @Column('decimal', { precision: 10, scale: 2 })
+  carPrice: number;
+
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.aracAdetCarpani)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
+
+
+}
+
+@Entity("ozel_cekici_degerleri")
+export class OzelCekiciDegerleri {
+  @Column()
+  baseUcret: number;
+
+  @OneToMany(() => KmBasiUcret, (kmBasiUcret) => kmBasiUcret.il, { cascade: true })
+  kmBasiUcretleri: KmBasiUcret[];
+
+  @Column()
+  kopruGecisUcreti: number;
+
+  @OneToMany(() => SegmentKatsayilari, (segmentKatsayilari) => segmentKatsayilari.segment , { cascade: true })
+  segmentKatsayilari: SegmentKatsayilari[];
+
+  @OneToMany(() => AracDurumu, (aracDurumu) => aracDurumu.ozelCekiciDegerleri , { cascade: true })
+  aracDurumu: AracDurumu[];
+
+}
+
+// Yol Yardım Değişkenleri
+// segment katsayilari
+// merkez konum
+// base ucret
+// km basi ucret
+// aracın durumu
+
+@Entity('yol_yardim_degerleri')
+export class YolYardimDegerleri {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column('text')
-  baseUcret: string;
+  @OneToMany(() => SegmentKatsayilari, (segmentKatsayilari) => segmentKatsayilari.yolYardimDegerleri , { cascade: true })
+  segmentKatsayilari: SegmentKatsayilari[];
 
-  @Column('text')
-  kmBasiUcret: string;
+  @Column()
+  baseUcret: number;
 
-  @Column('text')
-  kopruGecisUcreti: string;
+  @Column()
+  kmBasiUcret: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @OneToMany(() => AracDurumu, (aracDurumu) => aracDurumu.yolYardimDegerleri , { cascade: true })
+  aracDurumu: AracDurumu[];
+  
+  @Column('decimal', { precision: 10, scale: 8 })
+  lat: number;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
-} 
+  @Column('decimal', { precision: 10, scale: 8 })
+  lng: number;
+
+}
+
+// 
+@Entity('aralik_ucretleri')
+export class AralikUcretleri {
+  @PrimaryColumn()
+  mesafe: number;
+
+  @Column()
+  ucret: number;
+
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.aralikUcretleri)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
+}
+
+@Entity('otopark_konum')
+export class OtoparkKonum {
+  @PrimaryColumn()
+  il: string;
+
+  @Column()
+  lat: number;
+
+  @Column()
+  lng: number;
+
+  @ManyToOne(() => TopluCekiciDegerleri, (topluCekiciDegerleri) => topluCekiciDegerleri.otoparkKonum)
+  @JoinColumn()
+  topluCekiciDegerleri: TopluCekiciDegerleri;
+}
+// Toplu Çekici Değişkenleri
+// segment katsayilari
+// otopark konum 81 il
+// base ucret
+// km aralikları km ucretleri
+// arac durumu
+// arac adedi carpani
+// 81 il için özel çekici ucretleri
+// 81 ile extra çarpan
+
+@Entity('toplu_cekici_degerleri')
+export class TopluCekiciDegerleri {
+
+  @Column()
+  baseUcret: number;
+
+  @OneToMany(() => SegmentKatsayilari, (segmentKatsayilari) => segmentKatsayilari.segment , { cascade: true })
+  segmentKatsayilari: SegmentKatsayilari[];
+
+  @OneToMany(() => IlOzelCekiciUcretleri, (ilOzelCekiciUcretleri) => ilOzelCekiciUcretleri.topluCekiciDegerleri , { cascade: true })
+  ilOzelCekiciUcretleri: IlOzelCekiciUcretleri[];
+
+  @OneToMany(() => IlExtraCekiciUcretleri, (ilExtraCekiciUcretleri) => ilExtraCekiciUcretleri.topluCekiciDegerleri , { cascade: true })
+  ilExtraCekiciUcretleri: IlExtraCekiciUcretleri[];
+
+  @OneToMany(() => AracAdetCarpani, (aracAdetCarpani) => aracAdetCarpani.topluCekiciDegerleri , { cascade: true })
+  aracAdetCarpani: AracAdetCarpani[];
+
+  @OneToMany(() => AracDurumu, (aracDurumu) => aracDurumu.topluCekiciDegerleri , { cascade: true })
+  aracDurumu: AracDurumu[];
+
+  @OneToMany(() => AralikUcretleri, (aralikUcretleri) => aralikUcretleri.topluCekiciDegerleri , { cascade: true })
+  aralikUcretleri: AralikUcretleri[];
+
+  @OneToMany(() => OtoparkKonum, (otoparkKonum) => otoparkKonum.topluCekiciDegerleri , { cascade: true })
+  otoparkKonum: OtoparkKonum[];
+}
+
+
+
+
+
+
