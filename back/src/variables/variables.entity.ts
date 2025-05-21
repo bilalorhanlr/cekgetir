@@ -1,226 +1,137 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, PrimaryColumn, OneToMany } from 'typeorm';
+import { CarStatusType } from './car-status-type';
 
+@Entity()
+export class CarSegment {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-@Entity('ortak_degerler')
-export class OrtakDegerler {
-  @PrimaryColumn('text')
-  carType: string;
+    @Column()
+    name: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  price: number;
+    @Column('decimal', { precision: 10, scale: 2, default: 0.0 })
+    price: number;
 
-  }
-
-@Entity('variables')
-export class Variables {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  // Yol Yardım Değişkenleri
-  @OneToMany(() => OrtakDegerler, (ortakDegerler) => ortakDegerler.carType , { cascade: false })
-  ortakDegerler: OrtakDegerler[];
-
-  @Column('json')
-  merkezKonum: {
-    lat: number;
-    lng: number;
-  };
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  baseUcret: number;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  kmBasiUcret: number;
-
-  @Column('json')
-  aracDurumu: {
-    [key: string]: number;
-  };
-
-  // Özel Çekici Değişkenleri
-  @Column('decimal', { precision: 10, scale: 2 })
-  kopruGecisUcreti: number;
-
-  // Toplu Çekici Değişkenleri
-  @Column('json')
-  otoparkKonumlari: {
-    [key: string]: {
-      lat: number;
-      lng: number;
-    };
-  };
-
-  @Column('json')
-  kmUcretleri: {
-    '0-100': number;
-    '100-200': number;
-    '200-300': number;
-    [key: string]: number;
-  };
-
-  @Column('json')
-  aracAdediCarpani: {
-    [key: string]: number;
-  };
-
-  @Column('json')
-  ilOzelCekiciUcretleri: {
-    [key: string]: number;
-  };
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column({type: 'enum', enum: CarStatusType})
+    type: CarStatusType;
 }
 
-@Entity('segment_katsayilari')
-export class SegmentKatsayilari {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class CarStatus {
+    @PrimaryGeneratedColumn()
+    id: number;
+    
+    @Column()
+    name: string;
 
-  @Column()
-  segment: string;
+    @Column()
+    price: number;
 
-  @Column('text')
-  katsayi: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column({type: 'enum', enum: CarStatusType})
+    type: CarStatusType;
 }
 
-@Entity('merkez_konum')
-export class MerkezKonum {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class YolYardim {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column('text')
-  lat: string;
+    @Column()
+    basePrice: number;
 
-  @Column('text')
-  lng: string;
+    @Column('decimal', { precision: 10, scale: 8 })
+    baseLng: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+    @Column('decimal', { precision: 10, scale: 8 })
+    baseLat: number;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column()
+    basePricePerKm: number;
+
+    @Column('decimal', { precision: 3, scale: 2, default: 0.0 })
+    nightPrice: number;
 }
 
-@Entity('arac_durumu')
-export class AracDurumu {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class OzelCekici {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column()
-  durum: string;
-
-  @Column('text')
-  katsayi: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column('decimal', { precision: 3, scale: 2, default: 0.0 })
+    nightPrice: number;
 }
 
-@Entity('otopark_konumlari')
-export class OtoparkKonumlari {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class OzelCekiciSehir {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column()
-  il: string;
+    @Column()
+    sehirAdi: string;
 
-  @Column('text')
-  lat: string;
+    @Column('decimal', { precision: 10, scale: 2, default: 1000.0 })
+    basePrice: number;
 
-  @Column('text')
-  lng: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column('decimal', { precision: 10, scale: 2, default: 15.0 })
+    basePricePerKm: number;
 }
 
-@Entity('km_ucretleri')
-export class KmUcretleri {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class TopluCekiciSehir {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column()
-  aralik: string;
+    @Column()
+    sehirAdi: string;
 
-  @Column('text')
-  ucret: string;
+    @Column('decimal', { precision: 10, scale: 2, default: 1000.0 })
+    basePrice: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+    @Column('decimal', { precision: 10, scale: 2, default: 15.0 })
+    basePricePerKm: number;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column('decimal', { precision: 10, scale: 2, default: 1000.0 })
+    ozelCekiciBasePrice: number;
+
+    @Column('decimal', { precision: 10, scale: 2, default: 15.0 })
+    ozelCekiciBasePricePerKm: number;
+
+    @Column('decimal', { precision: 10, scale: 8, nullable: true })
+    otoparkLat: number | null;
+
+    @Column('decimal', { precision: 10, scale: 8, nullable: true })
+    otoparkLng: number | null;
+
+    @Column({ nullable: true, type: 'text' })
+    otoparkAdres: string | null;
 }
 
-@Entity('arac_adedi_carpani')
-export class AracAdediCarpani {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class TopluCekiciKmFiyat {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column()
-  adet: string;
+    @Column()
+    minKm: number;
 
-  @Column('text')
-  carpan: string;
+    @Column()
+    maxKm: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column('decimal', { precision: 10, scale: 2 })
+    kmBasiUcret: number;
 }
 
-@Entity('il_ozel_cekici_ucretleri')
-export class IlOzelCekiciUcretleri {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity()
+export class TopluCekici {
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column()
-  il: string;
+    @Column('decimal', { precision: 10, scale: 2 })
+    basePrice: number;
 
-  @Column('text')
-  ucret: string;
+    @CreateDateColumn()
+    createdAt: Date;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-
-@Entity('genel_ayarlar')
-export class GenelAyarlar {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column('text')
-  baseUcret: string;
-
-  @Column('text')
-  kmBasiUcret: string;
-
-  @Column('text')
-  kopruGecisUcreti: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 } 

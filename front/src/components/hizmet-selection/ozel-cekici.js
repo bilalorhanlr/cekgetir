@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GoogleMap, Marker, useLoadScript, DirectionsRenderer } from '@react-google-maps/api'
+import api from '@/utils/axios'
 import axios from 'axios'
 
 const libraries = ['places']
@@ -22,6 +23,19 @@ const mapOptions = {
   clickableIcons: false
 }
 
+// Şehir adını normalize eden fonksiyon
+function normalizeSehirAdi(sehir) {
+  return sehir
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/İ/g, 'i');
+}
+
 export default function OzelCekiciModal({ onClose }) {
   const [step, setStep] = useState(1)
   const [pickupLocation, setPickupLocation] = useState(null)
@@ -37,6 +51,7 @@ export default function OzelCekiciModal({ onClose }) {
     tip: '',
     durum: ''
   })
+
   const [musteriBilgileri, setMusteriBilgileri] = useState({
     ad: '',
     soyad: '',
@@ -59,10 +74,12 @@ export default function OzelCekiciModal({ onClose }) {
     aracMarkalari: [],
     aracModelleri: {},
     yillar: [],
-    segmentler: []
+    segmentler: [],
+    durumlar: []
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [sehirFiyatlandirma, setSehirFiyatlandirma] = useState(null)
   const mapRef = useRef(null)
 
   const { isLoaded, loadError } = useLoadScript({
@@ -73,15 +90,48 @@ export default function OzelCekiciModal({ onClose }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data: variablesData } = await axios.get('/api/variables/ozel-cekici/all');
-        setPricingData(variablesData);
+        setLoading(true);
+        const [
+          { data: ozelCekiciData },
+          { data: segmentsData },
+          { data: statusesData },
+          { data: vehicleInfoData }
+        ] = await Promise.all([
+          api.get('/api/variables/ozel-cekici'),
+          api.get('/api/variables/car-segments?type=ozel-cekici'),
+          api.get('/api/variables/car-statuses?type=ozel-cekici'),
+          axios.get('/data/arac-info.json')
+        ]);
 
-        const vehicleResponse = await axios.get('/data/arac-info.json');
-        setVehicleData(vehicleResponse.data);
+        setPricingData({
+          ...ozelCekiciData,
+          segments: segmentsData.map(segment => ({
+            id: segment.id,
+            name: segment.name,
+            price: segment.price
+          })),
+          statuses: statusesData.map(status => ({
+            id: status.id,
+            name: status.name,
+            price: status.price
+          }))
+        });
+
+        setVehicleData({
+          segments: segmentsData,
+          brands: vehicleInfoData.aracMarkalari,
+          models: vehicleInfoData.aracModelleri,
+          years: vehicleInfoData.yillar
+        });
+
+        setLoading(false);
       } catch (error) {
-        console.error('Veri yükleme hatası:', error);
+        console.error('Error fetching data:', error);
+        setError('Veriler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+        setLoading(false);
       }
     };
+
     fetchData();
   }, []);
 
@@ -90,36 +140,91 @@ export default function OzelCekiciModal({ onClose }) {
     if (!window.google) return ''
     const geocoder = new window.google.maps.Geocoder()
     return new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
         if (status === 'OK' && results[0]) {
-          resolve(results[0].formatted_address)
+          const address = results[0].formatted_address;
+          
+          // Şehir bilgisini bul
+          let sehir = '';
+          for (const component of results[0].address_components) {
+            if (component.types.includes('administrative_area_level_1')) {
+              sehir = component.long_name;
+              break;
+            }
+          }
+
+          // Şehir fiyatlandırmasını getir
+          if (sehir) {
+            try {
+              const normalizedSehir = normalizeSehirAdi(sehir);
+              const response = await api.get(`/api/variables/ozel-cekici/sehirler/${normalizedSehir}`);
+              setSehirFiyatlandirma(response.data);
+            } catch (error) {
+              console.error('Şehir fiyatlandırması getirilemedi:', error);
+              setSehirFiyatlandirma(null);
+            }
+          }
+
+          resolve(address);
         } else {
-          resolve('')
+          resolve('');
         }
-      })
-    })
+      });
+    });
   }
 
   // Fiyat hesaplama fonksiyonu
-  const fiyatHesapla = useCallback(async () => {
+  const fiyatHesapla = useCallback(() => {
     // Gerekli kontroller
-    if (!pickupLocation || !deliveryLocation || !aracBilgileri.tip) {
+    if (!pickupLocation || !deliveryLocation || !aracBilgileri.tip || !aracBilgileri.durum) {
         setPrice(0);
         return;
     }
 
-    // Fiyat hesaplama bileşenleri
-    const basePrice = pricingData?.basePrice || 0;  // Temel fiyat
-    const distanceMultiplier = routeInfo?.distance ? routeInfo.distance * (pricingData?.distanceMultiplier || 0) : 0;  // Mesafe çarpanı
-    const vehicleTypeMultiplier = pricingData?.vehicleTypeMultipliers?.[aracBilgileri.tip] || 1;  // Araç tipi çarpanı
+    // Şehir adı normalize edilmiş şekilde alınmalı!
+    const isIstanbul = sehirFiyatlandirma && (
+      sehirFiyatlandirma.sehirAdi?.toLocaleLowerCase('tr-TR') === 'istanbul'
+        || sehirFiyatlandirma.sehirAdi?.toLocaleLowerCase('tr-TR') === 'i̇stanbul'
+    );
+
+    const currentHour = new Date().getHours();
+    const isNightTime = (currentHour >= 22 || currentHour < 8);
+
+    const nightMultiplier = (isIstanbul && isNightTime)
+      ? (pricingData?.nightPrice || 1)
+      : 1;
     
-    // Araç durumuna göre ek fiyat
-    const vehicleStatusMultiplier = pricingData?.vehicleStatusMultipliers?.[aracBilgileri.durum] || 1;
+    // Fiyat hesaplama bileşenleri
+    const basePrice = Number(sehirFiyatlandirma?.basePrice) || 0;  // Şehir bazlı temel fiyat
+    const distanceMultiplier = routeInfo?.distance ? routeInfo.distance * (Number(sehirFiyatlandirma?.basePricePerKm) || 0) : 0;  // Şehir bazlı km ücreti
+    
+    // Araç tipine göre segment katsayısı (diziden bul)
+    const segmentObj = pricingData?.segments?.find(seg => String(seg.id) === String(aracBilgileri.tip));
+    const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
+    
+    // Araç durumuna göre durum katsayısı (diziden bul)
+    const statusObj = pricingData?.statuses?.find(st => String(st.id) === String(aracBilgileri.durum));
+    const statusMultiplier = statusObj ? Number(statusObj.price) : 1;
     
     // Toplam fiyat hesaplama
-    const totalPrice = (basePrice + distanceMultiplier) * vehicleTypeMultiplier * vehicleStatusMultiplier;
-    setPrice(totalPrice);
-  }, [pickupLocation, deliveryLocation, aracBilgileri, routeInfo, pricingData]);
+    const totalPrice = (basePrice + distanceMultiplier) * segmentMultiplier * statusMultiplier * nightMultiplier;
+    setPrice(Math.round(totalPrice));
+  }, [pickupLocation, deliveryLocation, aracBilgileri, routeInfo, pricingData, sehirFiyatlandirma]);
+
+  // Fiyat hesaplamayı useEffect ile tetikle
+  useEffect(() => {
+    if (
+      pickupLocation &&
+      deliveryLocation &&
+      aracBilgileri.tip &&
+      aracBilgileri.durum &&
+      routeInfo &&
+      pricingData &&
+      sehirFiyatlandirma
+    ) {
+      fiyatHesapla();
+    }
+  }, [pickupLocation, deliveryLocation, aracBilgileri, routeInfo, pricingData, sehirFiyatlandirma, fiyatHesapla]);
 
   // Rota hesaplama fonksiyonu
   const calculateRoute = useCallback(async () => {
@@ -157,11 +262,10 @@ export default function OzelCekiciModal({ onClose }) {
           duration: step.duration.text
         }))
       })
-      fiyatHesapla()
     } catch (error) {
       console.error('Error calculating route:', error)
     }
-  }, [pickupLocation, deliveryLocation, fiyatHesapla])
+  }, [pickupLocation, deliveryLocation])
 
   // Adres arama ile konum seçimi
   const handlePlaceChanged = async (e) => {
@@ -172,6 +276,28 @@ export default function OzelCekiciModal({ onClose }) {
         lng: place.geometry.location.lng,
         address: place.formatted_address
       }
+
+      // Şehir bilgisini bul
+      let sehir = '';
+      for (const component of place.address_components) {
+        if (component.types.includes('administrative_area_level_1')) {
+          sehir = component.long_name;
+          break;
+        }
+      }
+
+      // Şehir fiyatlandırmasını getir
+      if (sehir) {
+        try {
+          const normalizedSehir = normalizeSehirAdi(sehir);
+          const response = await api.get(`/api/variables/ozel-cekici/sehirler/${normalizedSehir}`);
+          setSehirFiyatlandirma(response.data);
+        } catch (error) {
+          console.error('Şehir fiyatlandırması getirilemedi:', error);
+          setSehirFiyatlandirma(null);
+        }
+      }
+
       if (activeLocation === 'pickup') {
         setPickupLocation(newLocation)
         setPickupSearchValue(place.formatted_address)
@@ -189,6 +315,33 @@ export default function OzelCekiciModal({ onClose }) {
     const lng = e.latLng.lng()
     const address = await getAddressFromLatLng(lat, lng)
     const newLocation = { lat, lng, address }
+
+    // Google Maps Geocoder ile şehir bilgisini al
+    const geocoder = new window.google.maps.Geocoder()
+    geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
+      if (status === 'OK' && results[0]) {
+        let sehir = '';
+        for (const component of results[0].address_components) {
+          if (component.types.includes('administrative_area_level_1')) {
+            sehir = component.long_name;
+            break;
+          }
+        }
+
+        // Şehir fiyatlandırmasını getir
+        if (sehir) {
+          try {
+            const normalizedSehir = normalizeSehirAdi(sehir);
+            const response = await api.get(`/api/variables/ozel-cekici/sehirler/${normalizedSehir}`);
+            setSehirFiyatlandirma(response.data);
+          } catch (error) {
+            console.error('Şehir fiyatlandırması getirilemedi:', error);
+            setSehirFiyatlandirma(null);
+          }
+        }
+      }
+    });
+
     if (activeLocation === 'pickup') {
       setPickupLocation(newLocation)
       setPickupSearchValue(address)
@@ -245,9 +398,7 @@ export default function OzelCekiciModal({ onClose }) {
   // Sipariş oluşturma fonksiyonu
   const createOrder = async () => {
     try {
-      const { data } = await axios.post('/api/orders', {
-        pickupCity: selectedPickupCity,
-        deliveryCity: selectedDeliveryCity,
+      const { data } = await api.post('/api/orders', {
         vehicles: [aracBilgileri],
         price,
         customerInfo: musteriBilgileri,
@@ -267,6 +418,108 @@ export default function OzelCekiciModal({ onClose }) {
       console.error('Sipariş oluşturma hatası:', error);
     }
   };
+
+  const renderAracBilgileri = () => (
+    <div className="space-y-4">zz
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-[#404040] mb-2">
+            Araç Segmenti
+          </label>
+          <select
+            value={aracBilgileri.tip}
+            onChange={(e) => setAracBilgileri({ ...aracBilgileri, tip: e.target.value })}
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+          >
+            <option value="">Segment Seçin</option>
+            {vehicleData?.segments?.map((segment) => (
+              <option key={segment.id} value={segment.id}>{segment.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[#404040] mb-2">
+            Marka
+          </label>
+          <select
+            value={aracBilgileri.marka}
+            onChange={(e) => setAracBilgileri({ ...aracBilgileri, marka: e.target.value, model: '' })}
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+          >
+            <option value="">Marka Seçin</option>
+            {vehicleData?.brands?.map((brand) => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[#404040] mb-2">
+            Model
+          </label>
+          <select
+            value={aracBilgileri.model}
+            onChange={(e) => setAracBilgileri({ ...aracBilgileri, model: e.target.value })}
+            disabled={!aracBilgileri.marka}
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent disabled:opacity-50"
+          >
+            <option value="">Model Seçin</option>
+            {aracBilgileri.marka && vehicleData?.models?.[aracBilgileri.marka]?.map((model) => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[#404040] mb-2">
+            Yıl
+          </label>
+          <select
+            value={aracBilgileri.yil}
+            onChange={(e) => setAracBilgileri({ ...aracBilgileri, yil: e.target.value })}
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+          >
+            <option value="">Yıl Seçin</option>
+            {vehicleData?.years?.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-[#404040] mb-2">
+            Plaka
+          </label>
+          <input
+            type="text"
+            value={aracBilgileri.plaka}
+            onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value })}
+            placeholder="Plaka"
+            maxLength={8}
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-[#404040] mb-2">
+          Araç Durumu
+        </label>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {pricingData?.statuses?.map((status) => (
+            <button
+              key={status.id}
+              type="button"
+              onClick={() => setAracBilgileri({ ...aracBilgileri, durum: status.id })}
+              className={`p-2 rounded-lg border transition-colors text-sm font-medium ${
+                aracBilgileri.durum === status.id
+                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500'
+                  : 'bg-[#141414] border-[#404040] text-[#404040] hover:bg-[#202020] hover:text-white'
+              }`}
+            >
+              {status.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   if (loadError) {
     return <div className="p-8 text-white">Harita yüklenemedi.</div>
@@ -433,80 +686,12 @@ export default function OzelCekiciModal({ onClose }) {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-[#404040] mb-2">
-                    Araç Bilgileri
-                  </label>
                   {loading ? (
                     <div className="text-[#404040]">Yükleniyor...</div>
                   ) : error ? (
                     <div className="text-red-500">{error}</div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <select
-                        value={aracBilgileri.tip}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, tip: e.target.value })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Araç Tipi Seçin</option>
-                        {vehicleData.segmentler.map(segment => (
-                          <option key={segment.id} value={segment.id}>{segment.title}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={aracBilgileri.marka}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, marka: e.target.value, model: '' })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Marka Seçin</option>
-                        {vehicleData.aracMarkalari.map(marka => (
-                          <option key={marka} value={marka}>{marka}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={aracBilgileri.model}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, model: e.target.value })}
-                        disabled={!aracBilgileri.marka}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent disabled:opacity-50"
-                      >
-                        <option value="">Model Seçin</option>
-                        {aracBilgileri.marka && vehicleData.aracModelleri[aracBilgileri.marka]?.map(model => (
-                          <option key={model} value={model}>{model}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={aracBilgileri.yil}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, yil: e.target.value })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Yıl Seçin</option>
-                        {vehicleData.yillar.map(yil => (
-                          <option key={yil} value={yil}>{yil}</option>
-                        ))}
-                      </select>
-
-                      <input
-                        type="text"
-                        value={aracBilgileri.plaka}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value.toUpperCase() })}
-                        placeholder="Plaka"
-                        maxLength={8}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      />
-
-                      <select
-                        value={aracBilgileri.durum}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, durum: e.target.value })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Araç Durumu Seçin</option>
-                        <option value="calisiyor">Çalışıyor</option>
-                        <option value="kazali">Kazalı</option>
-                        <option value="vites_p">Vites P'de Kaldı</option>
-                      </select>
-                    </div>
+                    renderAracBilgileri()
                   )}
                 </div>
               </div>
@@ -719,10 +904,7 @@ export default function OzelCekiciModal({ onClose }) {
                       <input
                         type="text"
                         value={musteriBilgileri.ad}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s]/g, '');
-                          setMusteriBilgileri({ ...musteriBilgileri, ad: value });
-                        }}
+                        onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, ad: e.target.value })}
                         required
                         className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Adınız"
@@ -735,54 +917,56 @@ export default function OzelCekiciModal({ onClose }) {
                       <input
                         type="text"
                         value={musteriBilgileri.soyad}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s]/g, '');
-                          setMusteriBilgileri({ ...musteriBilgileri, soyad: value });
-                        }}
+                        onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, soyad: e.target.value })}
                         required
                         className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Soyadınız"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#404040] mb-2">
-                        TC Kimlik No
-                      </label>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="tcVatandasi"
-                            checked={musteriBilgileri.tcVatandasi}
-                            onChange={(e) => {
-                              const newTcVatandasi = e.target.checked;
-                              setMusteriBilgileri({
-                                ...musteriBilgileri,
-                                tcVatandasi: newTcVatandasi,
-                                tcKimlik: newTcVatandasi ? '' : '11111111111'
-                              });
-                            }}
-                            className="w-4 h-4 rounded border-[#404040] bg-[#141414] text-yellow-500 focus:ring-yellow-500 focus:ring-offset-[#141414]"
-                          />
-                          <label htmlFor="tcVatandasi" className="text-sm text-[#404040]">
-                            TC Vatandaşıyım
+                    <div className="sm:col-span-2">
+                      <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="text-sm font-medium text-[#404040]">
+                            Kimlik Bilgileri
                           </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="tcVatandasi"
+                              checked={musteriBilgileri.tcVatandasi}
+                              onChange={(e) => {
+                                const newTcVatandasi = e.target.checked;
+                                setMusteriBilgileri({
+                                  ...musteriBilgileri,
+                                  tcVatandasi: newTcVatandasi,
+                                  tcKimlik: newTcVatandasi ? '' : '11111111111'
+                                });
+                              }}
+                              className="w-4 h-4 rounded border-[#404040] bg-[#141414] text-yellow-500 focus:ring-yellow-500 focus:ring-offset-[#141414]"
+                            />
+                            <label htmlFor="tcVatandasi" className="text-sm text-[#404040]">
+                              TC Vatandaşıyım
+                            </label>
+                          </div>
                         </div>
-                        {musteriBilgileri.tcVatandasi && (
+                        {musteriBilgileri.tcVatandasi ? (
                           <input
                             type="text"
                             value={musteriBilgileri.tcKimlik}
-                            onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, tcKimlik: e.target.value })}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                              setMusteriBilgileri({ ...musteriBilgileri, tcKimlik: value });
+                            }}
                             required
                             maxLength={11}
-                            className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 bg-[#202020] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                             placeholder="TC Kimlik No"
                           />
+                        ) : (
+                          <div className="w-full px-4 py-2.5 bg-[#202020] border border-[#404040] rounded-lg text-[#404040]">
+                            Yabancı Uyruklu
+                          </div>
                         )}
-                        <input
-                          type="hidden"
-                          value={musteriBilgileri.tcKimlik}
-                        />
                       </div>
                     </div>
                   </>
@@ -829,9 +1013,14 @@ export default function OzelCekiciModal({ onClose }) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={
+                    musteriBilgileri.musteriTipi === 'kisisel'
+                      ? (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email || (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik))
+                      : (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email)
+                  }
+                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Siparişi Tamamla
+                  İlerle
                 </button>
               </div>
             </form>

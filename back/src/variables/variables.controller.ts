@@ -1,167 +1,433 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards, NotFoundException } from '@nestjs/common';
 import { VariablesService } from './variables.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { 
-  SegmentKatsayilari,
-  MerkezKonum,
-  AracDurumu,
-  OtoparkKonumlari,
-  KmUcretleri,
-  AracAdediCarpani,
-  IlOzelCekiciUcretleri,
-  GenelAyarlar
-} from './variables.entity';
+import { CarSegment, CarStatus, YolYardim, TopluCekiciSehir } from './variables.entity';
+import { CarStatusType } from './car-status-type';
+import { Query } from '@nestjs/common';
+import { VariablesSeedService } from './variables-seed.service';
 
 @Controller('variables')
-@UseGuards(JwtAuthGuard)
 export class VariablesController {
-  constructor(private readonly variablesService: VariablesService) {}
+  constructor(
+    private readonly variablesService: VariablesService,
+    private readonly variablesSeedService: VariablesSeedService
+  ) {}
 
-  // Segment Katsayıları
-  @Get('segment-katsayilari')
-  async findAllSegmentKatsayilari() {
-    return await this.variablesService.findAllSegmentKatsayilari();
+  // Car Segment Operations
+  @Get('car-segments')
+  async findAllCarSegments(@Query('type') type: CarStatusType) {
+    return await this.variablesService.findAllCarSegments(type);
   }
 
-  @Post('segment-katsayilari')
-  async createSegmentKatsayilari(@Body() createDto: Partial<SegmentKatsayilari>) {
-    return await this.variablesService.createSegmentKatsayilari(createDto);
+  @Post('car-segments')
+  @UseGuards(JwtAuthGuard)
+  async createCarSegment(@Body() createDto: { name: string; price: number; type: CarStatusType }) {
+    return await this.variablesService.createCarSegment(createDto.name, createDto.price, createDto.type);
   }
 
-  @Patch('segment-katsayilari/:id')
-  async updateSegmentKatsayilari(@Param('id') id: string, @Body() updateDto: Partial<SegmentKatsayilari>) {
-    return await this.variablesService.updateSegmentKatsayilari(+id, updateDto);
+  @Patch('car-segments/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateCarSegment(
+    @Param('id') id: string,
+    @Body() updateDto: { name: string; price: number }
+  ) {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      throw new Error(`Geçersiz segment ID: ${id}`);
+    }
+    return await this.variablesService.updateCarSegment(parsedId, updateDto.name, updateDto.price);
   }
 
-  @Delete('segment-katsayilari/:id')
-  async removeSegmentKatsayilari(@Param('id') id: string) {
-    return await this.variablesService.removeSegmentKatsayilari(+id);
+  @Delete('car-segments/:id')
+  @UseGuards(JwtAuthGuard)
+  async removeCarSegment(@Param('id') id: string) {
+    return await this.variablesService.deleteCarSegment(+id);
   }
 
-  // Merkez Konum
-  @Get('merkez-konum')
-  async getMerkezKonum() {
-    return await this.variablesService.getMerkezKonum();
+  @Patch('car-segments/bulk/:type')
+  @UseGuards(JwtAuthGuard)
+  async updateCarSegments(
+    @Param('type') type: CarStatusType,
+    @Body() segments: { id: number; name: string; price: number }[]
+  ): Promise<CarSegment[]> {
+    try {
+      if (!segments || !Array.isArray(segments)) {
+        throw new Error('Geçersiz segment verisi');
+      }
+
+      const processedSegments = segments.map(segment => {
+        const parsedId = parseInt(String(segment.id), 10);
+        if (isNaN(parsedId)) {
+          throw new Error(`Geçersiz segment ID: ${segment.id}`);
+        }
+        return {
+          id: parsedId,
+          name: String(segment.name),
+          price: Number(segment.price)
+        };
+      });
+      
+      return await this.variablesService.updateCarSegments(type, processedSegments);
+    } catch (error) {
+      console.error('Controller - Segment güncelleme hatası:', error);
+      throw error;
+    }
   }
 
-  @Patch('merkez-konum')
-  async updateMerkezKonum(@Body() updateDto: Partial<MerkezKonum>) {
-    return await this.variablesService.updateMerkezKonum(updateDto);
+  // Car Status Operations
+  @Get('car-statuses')
+  async findAllCarStatuses(@Query('type') type: CarStatusType) {
+    return await this.variablesService.findAllCarStatuses(type);
   }
 
-  // Araç Durumu
-  @Get('arac-durumu')
-  async findAllAracDurumu() {
-    return await this.variablesService.findAllAracDurumu();
+  @Post('car-statuses')
+  @UseGuards(JwtAuthGuard)
+  async createCarStatus(
+    @Body() createDto: { name: string; price: number; type: string }
+  ) {
+    return await this.variablesService.createCarStatus(
+      createDto.name,
+      createDto.price,
+      createDto.type as any
+    );
   }
 
-  @Post('arac-durumu')
-  async createAracDurumu(@Body() createDto: Partial<AracDurumu>) {
-    return await this.variablesService.createAracDurumu(createDto);
+  @Patch('car-statuses/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateCarStatus(
+    @Param('id') id: string,
+    @Body() updateDto: { name: string; price: number; type: string }
+  ) {
+    return await this.variablesService.updateCarStatus(
+      +id,
+      updateDto.name,
+      updateDto.price,
+      updateDto.type as any
+    );
   }
 
-  @Patch('arac-durumu/:id')
-  async updateAracDurumu(@Param('id') id: string, @Body() updateDto: Partial<AracDurumu>) {
-    return await this.variablesService.updateAracDurumu(+id, updateDto);
+  @Delete('car-statuses/:id')
+  @UseGuards(JwtAuthGuard)
+  async removeCarStatus(@Param('id') id: string) {
+    return await this.variablesService.deleteCarStatus(+id);
   }
 
-  @Delete('arac-durumu/:id')
-  async removeAracDurumu(@Param('id') id: string) {
-    return await this.variablesService.removeAracDurumu(+id);
+  @Patch('car-statuses/bulk/:type')
+  @UseGuards(JwtAuthGuard)
+  async updateCarStatuses(
+    @Param('type') type: CarStatusType,
+    @Body() statuses: { id: number; name: string; price: number }[]
+  ): Promise<CarStatus[]> {
+    try {
+      if (!statuses || !Array.isArray(statuses)) {
+        throw new Error('Geçersiz status verisi');
+      }
+
+      const processedStatuses = statuses.map(status => {
+        const parsedId = parseInt(String(status.id), 10);
+        if (isNaN(parsedId)) {
+          throw new Error(`Geçersiz status ID: ${status.id}`);
+        }
+        return {
+          id: parsedId,
+          name: String(status.name),
+          price: Number(status.price)
+        };
+      });
+      
+      return await this.variablesService.updateCarStatuses(type, processedStatuses);
+    } catch (error) {
+      console.error('Controller - Status güncelleme hatası:', error);
+      throw error;
+    }
   }
 
-  // Otopark Konumları
-  @Get('otopark-konumlari')
-  async findAllOtoparkKonumlari() {
-    return await this.variablesService.findAllOtoparkKonumlari();
+  // YolYardim Operations
+  @Get('yol-yardim')
+  async getYolYardim() {
+    return this.variablesService.findYolYardim();
   }
 
-  @Post('otopark-konumlari')
-  async createOtoparkKonumlari(@Body() createDto: Partial<OtoparkKonumlari>) {
-    return await this.variablesService.createOtoparkKonumlari(createDto);
+  @Post('yol-yardim')
+  @UseGuards(JwtAuthGuard)
+  async createYolYardim(
+    @Body() createDto: {
+      basePrice: number;
+      baseLng: number;
+      baseLat: number;
+      basePricePerKm: number;
+      nightPrice: number;
+    }
+  ) {
+    return await this.variablesService.createYolYardim(
+      createDto.basePrice,
+      createDto.baseLng,
+      createDto.baseLat,
+      createDto.basePricePerKm,
+      createDto.nightPrice  
+    );
   }
 
-  @Patch('otopark-konumlari/:id')
-  async updateOtoparkKonumlari(@Param('id') id: string, @Body() updateDto: Partial<OtoparkKonumlari>) {
-    return await this.variablesService.updateOtoparkKonumlari(+id, updateDto);
+  @Patch('yol-yardim')
+  @UseGuards(JwtAuthGuard)
+  async updateYolYardim(
+    @Body() updateDto: {
+      basePrice: number;
+      baseLng: number;
+      baseLat: number;
+      basePricePerKm: number;
+      nightPrice: number;
+    }
+  ) {
+    return await this.variablesService.updateYolYardim(
+      updateDto.basePrice,
+      updateDto.baseLng,
+      updateDto.baseLat,
+      updateDto.basePricePerKm,
+      updateDto.nightPrice
+    );
   }
 
-  @Delete('otopark-konumlari/:id')
-  async removeOtoparkKonumlari(@Param('id') id: string) {
-    return await this.variablesService.removeOtoparkKonumlari(+id);
+  // OzelCekici Operations
+  @Get('ozel-cekici')
+  async getOzelCekici() {
+    return await this.variablesService.findOzelCekici();
   }
 
-  // KM Ücretleri
-  @Get('km-ucretleri')
-  async findAllKmUcretleri() {
-    return await this.variablesService.findAllKmUcretleri();
+  @Post('ozel-cekici')
+  @UseGuards(JwtAuthGuard)
+  async createOzelCekici(
+    @Body() createDto: {
+      nightPrice: number;
+    }
+  ) {
+    return await this.variablesService.createOzelCekici(
+      createDto.nightPrice  
+    );
   }
 
-  @Post('km-ucretleri')
-  async createKmUcretleri(@Body() createDto: Partial<KmUcretleri>) {
-    return await this.variablesService.createKmUcretleri(createDto);
+  @Patch('ozel-cekici')
+  @UseGuards(JwtAuthGuard)
+  async updateOzelCekici(
+    @Body() updateDto: {
+      nightPrice: number;
+    }
+  ) {
+    return await this.variablesService.updateOzelCekici(
+      updateDto.nightPrice
+    );
   }
 
-  @Patch('km-ucretleri/:id')
-  async updateKmUcretleri(@Param('id') id: string, @Body() updateDto: Partial<KmUcretleri>) {
-    return await this.variablesService.updateKmUcretleri(+id, updateDto);
+  // OzelCekiciSehir Operations
+  @Get('ozel-cekici/sehirler')
+  async getAllOzelCekiciSehirler() {
+    return await this.variablesService.findAllOzelCekiciSehirler();
   }
 
-  @Delete('km-ucretleri/:id')
-  async removeKmUcretleri(@Param('id') id: string) {
-    return await this.variablesService.removeKmUcretleri(+id);
+  @Get('ozel-cekici/sehirler/:sehirAdi')
+  async getOzelCekiciSehirBySehirAdi(@Param('sehirAdi') sehirAdi: string) {
+    return await this.variablesService.findOzelCekiciSehirBySehirAdi(sehirAdi);
   }
 
-  // Araç Adedi Çarpanı
-  @Get('arac-adedi-carpani')
-  async findAllAracAdediCarpani() {
-    return await this.variablesService.findAllAracAdediCarpani();
+  @Post('ozel-cekici/sehirler')
+  @UseGuards(JwtAuthGuard)
+  async createOzelCekiciSehir(
+    @Body() createDto: {
+      sehirAdi: string;
+      basePrice: number;
+      basePricePerKm: number;
+    }
+  ) {
+    return await this.variablesService.createOzelCekiciSehir(
+      createDto.sehirAdi,
+      createDto.basePrice,
+      createDto.basePricePerKm
+    );
   }
 
-  @Post('arac-adedi-carpani')
-  async createAracAdediCarpani(@Body() createDto: Partial<AracAdediCarpani>) {
-    return await this.variablesService.createAracAdediCarpani(createDto);
+  @Patch('ozel-cekici/sehirler/:sehirAdi')
+  @UseGuards(JwtAuthGuard)
+  async updateOzelCekiciSehir(
+    @Param('sehirAdi') sehirAdi: string,
+    @Body() updateDto: {
+      basePrice: number;
+      basePricePerKm: number;
+    }
+  ) {
+    return await this.variablesService.updateOzelCekiciSehir(
+      sehirAdi,
+      updateDto.basePrice,
+      updateDto.basePricePerKm
+    );
   }
 
-  @Patch('arac-adedi-carpani/:id')
-  async updateAracAdediCarpani(@Param('id') id: string, @Body() updateDto: Partial<AracAdediCarpani>) {
-    return await this.variablesService.updateAracAdediCarpani(+id, updateDto);
+  @Delete('ozel-cekici/sehirler/:sehirAdi')
+  @UseGuards(JwtAuthGuard)
+  async deleteOzelCekiciSehir(@Param('sehirAdi') sehirAdi: string) {
+    return await this.variablesService.deleteOzelCekiciSehir(sehirAdi);
   }
 
-  @Delete('arac-adedi-carpani/:id')
-  async removeAracAdediCarpani(@Param('id') id: string) {
-    return await this.variablesService.removeAracAdediCarpani(+id);
+  // TopluCekici Operations
+  @Get('toplu-cekici/cities')
+  async getTopluCekiciCities() {
+    return this.variablesService.getTopluCekiciCities();
   }
 
-  // İl Özel Çekici Ücretleri
-  @Get('il-ozel-cekici-ucretleri')
-  async findAllIlOzelCekiciUcretleri() {
-    return await this.variablesService.findAllIlOzelCekiciUcretleri();
+  @Get('toplu-cekici/km-prices')
+  async getTopluCekiciKmPrices() {
+    return this.variablesService.getTopluCekiciKmPrices();
   }
 
-  @Post('il-ozel-cekici-ucretleri')
-  async createIlOzelCekiciUcretleri(@Body() createDto: Partial<IlOzelCekiciUcretleri>) {
-    return await this.variablesService.createIlOzelCekiciUcretleri(createDto);
+  @Get('toplu-cekici/sehirler')
+  async getAllTopluCekiciSehirler() {
+    return await this.variablesService.findAllTopluCekiciSehirler();
   }
 
-  @Patch('il-ozel-cekici-ucretleri/:id')
-  async updateIlOzelCekiciUcretleri(@Param('id') id: string, @Body() updateDto: Partial<IlOzelCekiciUcretleri>) {
-    return await this.variablesService.updateIlOzelCekiciUcretleri(+id, updateDto);
+  @Get('toplu-cekici/all')
+  async getTopluCekiciAll() {
+    try {
+      const [topluCekici, sehirler, kmFiyatlar] = await Promise.all([
+        this.variablesService.findTopluCekici(),
+        this.variablesService.findAllTopluCekiciSehirler(),
+        this.variablesService.findAllTopluCekiciKmFiyatlar()
+      ]);
+
+      return {
+        topluCekici,
+        sehirler,
+        kmFiyatlar
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        const newTopluCekici = await this.variablesService.createTopluCekici(2000);
+        return {
+          topluCekici: newTopluCekici,
+          sehirler: [],
+          kmFiyatlar: []
+        };
+      }
+      throw error;
+    }
   }
 
-  @Delete('il-ozel-cekici-ucretleri/:id')
-  async removeIlOzelCekiciUcretleri(@Param('id') id: string) {
-    return await this.variablesService.removeIlOzelCekiciUcretleri(+id);
+  @Get('toplu-cekici')
+  async getTopluCekici() {
+    try {
+      return await this.variablesService.findTopluCekici();
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return await this.variablesService.createTopluCekici(2000);
+      }
+      throw error;
+    }
   }
 
-  // Genel Ayarlar
-  @Get('genel-ayarlar')
-  async getGenelAyarlar() {
-    return await this.variablesService.getGenelAyarlar();
+  @Patch('toplu-cekici')
+  @UseGuards(JwtAuthGuard)
+  async updateTopluCekici(@Body() updateDto: { basePrice: number }) {
+    return await this.variablesService.updateTopluCekici(updateDto.basePrice);
   }
 
-  @Patch('genel-ayarlar')
-  async updateGenelAyarlar(@Body() updateDto: Partial<GenelAyarlar>) {
-    return await this.variablesService.updateGenelAyarlar(updateDto);
+  @Get('toplu-cekici/sehirler/:sehirAdi')
+  async getTopluCekiciSehirBySehirAdi(@Param('sehirAdi') sehirAdi: string) {
+    return await this.variablesService.findTopluCekiciSehirBySehirAdi(sehirAdi);
   }
+
+  @Post('toplu-cekici/sehirler')
+  @UseGuards(JwtAuthGuard)
+  async createTopluCekiciSehir(
+    @Body() createDto: {
+      sehirAdi: string;
+      basePrice: number;
+      basePricePerKm: number;
+      otoparkLat?: number;
+      otoparkLng?: number;
+      otoparkAdres?: string;
+    }
+  ) {
+    return await this.variablesService.createTopluCekiciSehir(
+      createDto.sehirAdi,
+      createDto.basePrice,
+      createDto.basePricePerKm,
+      createDto.otoparkLat,
+      createDto.otoparkLng,
+      createDto.otoparkAdres
+    );
+  }
+
+  @Patch('toplu-cekici/sehirler/:sehirAdi')
+  @UseGuards(JwtAuthGuard)
+  async updateTopluCekiciSehir(
+    @Param('sehirAdi') sehirAdi: string,
+    @Body() updateDto: {
+      basePrice: number;
+      basePricePerKm: number;
+      otoparkAdres: string;
+      otoparkLat: number;
+      otoparkLng: number;
+    }
+  ) {
+    return await this.variablesService.updateTopluCekiciSehir(
+      sehirAdi,
+      updateDto.basePrice,
+      updateDto.basePricePerKm,
+      updateDto.otoparkAdres,
+      updateDto.otoparkLat,
+      updateDto.otoparkLng
+    );
+  }
+
+  @Delete('toplu-cekici/sehirler/:sehirAdi')
+  @UseGuards(JwtAuthGuard)
+  async deleteTopluCekiciSehir(@Param('sehirAdi') sehirAdi: string) {
+    return await this.variablesService.deleteTopluCekiciSehir(sehirAdi);
+  }
+
+  // TopluCekiciKmFiyat Operations
+  @Get('toplu-cekici/km-fiyatlar')
+  async getAllTopluCekiciKmFiyatlar() {
+    return await this.variablesService.findAllTopluCekiciKmFiyatlar();
+  }
+
+  @Post('toplu-cekici/km-fiyatlar')
+  @UseGuards(JwtAuthGuard)
+  async createTopluCekiciKmFiyat(
+    @Body() createDto: {
+      minKm: number;
+      maxKm: number;
+      kmBasiUcret: number;
+    }
+  ) {
+    return await this.variablesService.createTopluCekiciKmFiyat(
+      createDto.minKm,
+      createDto.maxKm,
+      createDto.kmBasiUcret
+    );
+  }
+
+  @Patch('toplu-cekici/km-fiyatlar/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateTopluCekiciKmFiyat(
+    @Param('id') id: string,
+    @Body() updateDto: {
+      minKm: number;
+      maxKm: number;
+      kmBasiUcret: number;
+    }
+  ) {
+    return await this.variablesService.updateTopluCekiciKmFiyat(
+      +id,
+      updateDto.minKm,
+      updateDto.maxKm,
+      updateDto.kmBasiUcret
+    );
+  }
+
+  @Post('seed')
+  @UseGuards(JwtAuthGuard)
+  async seed() {
+    await this.variablesSeedService.seed();
+    return { message: 'Seed completed successfully' };
+  }
+
 } 

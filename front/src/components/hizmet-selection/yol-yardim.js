@@ -23,18 +23,33 @@ const mapOptions = {
 export default function YolYardimModal({ onClose }) {
   const [step, setStep] = useState(1)
   const [selectedService, setSelectedService] = useState(null)
-  const [fiyatlandirma, setFiyatlandirma] = useState(null)
-  const [toplamFiyat, setToplamFiyat] = useState(null)
+  const [fiyatlandirma, setFiyatlandirma] = useState({
+    basePrice: 0,
+    basePricePerKm: 0,
+    nightPrice: 1.5,
+    baseLat: 40.9877,
+    baseLng: 29.1267,
+    arizaTipleri: {},
+    segmentler: []
+  })
+
   const [pnrNumber, setPnrNumber] = useState(null)
   const [pickupLocation, setPickupLocation] = useState(null)
   const [deliveryLocation, setDeliveryLocation] = useState(null)
-  const [selectedPickupCity, setSelectedPickupCity] = useState(null)
-  const [selectedDeliveryCity, setSelectedDeliveryCity] = useState(null)
   const [routeInfo, setRouteInfo] = useState(null)
-  const [pickupOtopark, setPickupOtopark] = useState(null)
-  const [deliveryOtopark, setDeliveryOtopark] = useState(null)
   const [araclar, setAraclar] = useState([])
-  const [musteriBilgileri, setMusteriBilgileri] = useState({})
+  const [musteriBilgileri, setMusteriBilgileri] = useState({
+    musteriTipi: 'kisisel',
+    ad: '',
+    soyad: '',
+    tcVatandasi: true,
+    tcKimlik: '',
+    telefon: '',
+    email: '',
+    firmaAdi: '',
+    vergiNo: '',
+    vergiDairesi: ''
+  })
   const [vehicleData, setVehicleData] = useState({
     aracMarkalari: [],
     aracModelleri: {},
@@ -64,43 +79,113 @@ export default function YolYardimModal({ onClose }) {
   })
 
   // Fiyat hesaplama fonksiyonu
-  const calculatePrice = useCallback((distance, duration) => {
-    if (!fiyatlandirma || !selectedAriza || !aracBilgileri.tip) {
+  const calculatePrice = useCallback(() => {
+    // Gerekli kontroller
+    if (!pickupLocation || !deliveryLocation || !aracBilgileri.tip || !aracBilgileri.durum) {
+      setPrice(0);
       return;
     }
-    
-    const arizaFiyat = fiyatlandirma.arizaTiplerineGore[selectedAriza.id];
-    const baseUcret = arizaFiyat?.baseUcret || 0;
-    const kmBasiUcret = fiyatlandirma.kmBasiUcret || 0;
-    
-    // Araç tipine göre katsayıyı bul
+
+    // Temel değerler
+    const basePrice = Number(fiyatlandirma?.basePrice) || 0;
+    const basePricePerKm = Number(fiyatlandirma?.basePricePerKm) || 0;
+    const distance = routeInfo?.distance || 0;
+    const nightPrice = Number(fiyatlandirma?.nightPrice) || 1.5;
+
+    // Segment bilgileri
+    const segmentObj = fiyatlandirma?.segmentler?.find(seg => String(seg.id) === String(aracBilgileri.tip));
+    const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
+
+    // Ara toplam hesaplama
+    const baseTotal = basePrice + (distance * basePricePerKm);
+
+    // Segment çarpanı uygulaması
+    const segmentTotal = baseTotal * segmentMultiplier;
+
+    // Gece ücreti kontrolü
+    const currentHour = new Date().getHours();
+    const isNightTime = currentHour >= 22 || currentHour < 8;
+    const finalPrice = isNightTime ? segmentTotal * nightPrice : segmentTotal;
+
+    setPrice(Math.round(finalPrice));
+  }, [fiyatlandirma, pickupLocation, deliveryLocation, aracBilgileri.tip, routeInfo.distance]);
+
+  // Fiyat detaylarını göster
+  const renderPriceDetails = () => {
+    if (!price || !routeInfo) return null;
+
     const segment = fiyatlandirma.segmentler.find(s => s.id === aracBilgileri.tip);
-    const katsayi = segment?.katsayi || 1;
-    
-    let totalPrice = (baseUcret + distance * kmBasiUcret) * katsayi;
-    
-    // Gece ücreti çarpanı
-    const now = new Date();
-    const currentHour = now.getHours();
-    const geceBaslangic = parseInt(fiyatlandirma.geceBaslangic.split(':')[0]);
-    const geceBitis = parseInt(fiyatlandirma.geceBitis.split(':')[0]);
-    
-    if (currentHour >= geceBaslangic || currentHour < geceBitis) {
-      totalPrice *= fiyatlandirma.geceUcreti;
-    }
-    
-    const finalPrice = Math.round(totalPrice);
-    setPrice(finalPrice);
-  }, [fiyatlandirma, selectedAriza, aracBilgileri.tip]);
+    const katsayi = parseFloat(segment?.price) || 1;
+    const arizaFiyat = fiyatlandirma.arizaTipleri[selectedAriza.id]?.price || 0;
+    const baseUcret = fiyatlandirma.basePrice;
+    const kmUcreti = routeInfo.distance * fiyatlandirma.basePricePerKm;
+    const araToplam = baseUcret + kmUcreti + arizaFiyat;
+    const segmentUcreti = araToplam * (katsayi - 1);
+    const geceUcreti = (currentHour >= 22 || currentHour < 6) ? (araToplam + segmentUcreti) * (fiyatlandirma.nightPrice - 1) : 0;
+
+    return (
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between text-[#404040]">
+          <span>Base Ücret:</span>
+          <span>{baseUcret.toLocaleString('tr-TR')} TL</span>
+        </div>
+        <div className="flex justify-between text-[#404040]">
+          <span>KM Ücreti ({routeInfo.distance.toFixed(1)} km):</span>
+          <span>{kmUcreti.toLocaleString('tr-TR')} TL</span>
+        </div>
+        <div className="flex justify-between text-[#404040]">
+          <span>Arıza Ücreti:</span>
+          <span>{arizaFiyat.toLocaleString('tr-TR')} TL</span>
+        </div>
+        <div className="flex justify-between text-[#404040]">
+          <span>Ara Toplam:</span>
+          <span>{araToplam.toLocaleString('tr-TR')} TL</span>
+        </div>
+        <div className="flex justify-between text-[#404040]">
+          <span>Segment Çarpanı ({katsayi}x):</span>
+          <span>+{segmentUcreti.toLocaleString('tr-TR')} TL</span>
+        </div>
+        {(currentHour >= 22 || currentHour < 6) && (
+          <div className="flex justify-between text-[#404040]">
+            <span>Gece Ücreti ({fiyatlandirma.nightPrice}x):</span>
+            <span>+{geceUcreti.toLocaleString('tr-TR')} TL</span>
+          </div>
+        )}
+        <div className="flex justify-between text-white font-medium pt-2 border-t border-[#404040]">
+          <span>Toplam:</span>
+          <span>{price.toLocaleString('tr-TR')} TL</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Fiyat detaylarını göster
+  const currentHour = new Date().getHours();
+
+  // Fiyat teklifi bölümünü güncelle
+  const renderPriceOffer = () => (
+    <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-white">Fiyat Teklifi</h3>
+        <div className="text-3xl font-bold text-yellow-500">
+          {price?.toLocaleString('tr-TR')} TL
+        </div>
+      </div>
+      {renderPriceDetails()}
+    </div>
+  );
 
   // Rota hesaplama fonksiyonu
   const calculateRoute = useCallback(async (destination) => {
-    if (!fiyatlandirma || !fiyatlandirma.merkezKonum) {
-      console.warn('Fiyatlandırma veya merkez konum bilgisi henüz yüklenmedi');
+    if (!fiyatlandirma) {
+      console.warn('Fiyatlandırma bilgisi henüz yüklenmedi');
       return;
     }
     
-    const origin = fiyatlandirma.merkezKonum;
+    const origin = {
+      lat: fiyatlandirma.baseLat,
+      lng: fiyatlandirma.baseLng
+    };
     
     if (!window.google) {
       console.warn('Google Maps API henüz yüklenmedi');
@@ -130,7 +215,7 @@ export default function YolYardimModal({ onClose }) {
             duration: step.duration.text
           }))
         });
-        calculatePrice(distance, duration);
+        calculatePrice();
       } else {
         console.error('Rota hesaplanırken bir hata oluştu:', status);
       }
@@ -140,7 +225,7 @@ export default function YolYardimModal({ onClose }) {
   // Arıza seçildiğinde fiyat hesaplama
   useEffect(() => {
     if (selectedAriza && location && routeInfo) {
-      calculatePrice(routeInfo.distance, routeInfo.duration);
+      calculatePrice();
     }
   }, [selectedAriza, location, routeInfo, calculatePrice]);
 
@@ -148,20 +233,63 @@ export default function YolYardimModal({ onClose }) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [vehicleResponse, variablesResponse] = await Promise.all([
-          axios.get('/data/arac-info.json'),
-          api.get('/api/variables/yol-yardim/all')
+        const [variablesResponse, carSegmentsResponse, carStatusesResponse, vehicleResponse] = await Promise.all([
+          api.get('/api/variables/yol-yardim'),
+          api.get('/api/variables/car-segments?type=yol-yardim'),
+          api.get('/api/variables/car-statuses?type=yol-yardim'),
+          axios.get('/data/arac-info.json')
         ]);
 
-        setVehicleData(vehicleResponse.data);
-        // Merge arizaTipleri from vehicleResponse with other variables
+        // Değişkenleri ayarla
+        const yolYardimData = variablesResponse.data || {
+          basePrice: 0,
+          basePricePerKm: 0,
+          nightPrice: 1.5,
+          baseLat: 40.9877,
+          baseLng: 29.1267
+        };
+
         setFiyatlandirma({
-          ...variablesResponse.data,
-          arizaTipleri: vehicleResponse.data.arizaTipleri
+          basePrice: yolYardimData.basePrice,
+          basePricePerKm: yolYardimData.basePricePerKm,
+          nightPrice: yolYardimData.nightPrice,
+          baseLat: yolYardimData.baseLat,
+          baseLng: yolYardimData.baseLng,
+          arizaTipleri: carStatusesResponse.data.reduce((acc, status) => {
+            acc[status.id] = {
+              name: status.name,
+              price: status.price
+            };
+            return acc;
+          }, {}),
+          segmentler: carSegmentsResponse.data.map(segment => ({
+            id: segment.id,
+            name: segment.name,
+            price: segment.price
+          }))
         });
+
+        // Araç bilgilerini ayarla
+        setVehicleData({
+          aracMarkalari: vehicleResponse.data.aracMarkalari,
+          aracModelleri: vehicleResponse.data.aracModelleri,
+          yillar: vehicleResponse.data.yillar,
+          segmentler: carSegmentsResponse.data
+        });
+
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
         setError('Veriler yüklenirken bir hata oluştu.');
+        // Set default values in case of error
+        setFiyatlandirma({
+          basePrice: 0,
+          basePricePerKm: 0,
+          nightPrice: 1.5,
+          baseLat: 40.9877,
+          baseLng: 29.1267,
+          arizaTipleri: {},
+          segmentler: []
+        });
       } finally {
         setLoading(false);
       }
@@ -173,14 +301,14 @@ export default function YolYardimModal({ onClose }) {
   // Konumlar değiştiğinde fiyat hesapla
   useEffect(() => {
     if (pickupLocation && deliveryLocation) {
-      calculatePrice(routeInfo.distance, routeInfo.duration);
+      calculatePrice();
     }
   }, [pickupLocation, deliveryLocation, routeInfo, calculatePrice]);
 
   // Araç listesi değiştiğinde fiyat hesapla
   useEffect(() => {
     if (araclar.length > 0) {
-      calculatePrice(routeInfo.distance, routeInfo.duration);
+      calculatePrice();
     }
   }, [araclar, routeInfo, calculatePrice]);
 
@@ -433,59 +561,74 @@ export default function YolYardimModal({ onClose }) {
                     <div className="text-red-500">{error}</div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <select
-                        value={aracBilgileri.tip}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, tip: e.target.value })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Araç Tipi Seçin</option>
-                        {vehicleData.segmentler.map(segment => (
-                          <option key={segment.id} value={segment.id}>{segment.title}</option>
-                        ))}
-                      </select>
+                      <div>
+                        <label className="block text-sm text-[#404040] mb-1">Araç Segmenti</label>
+                        <select
+                          value={aracBilgileri.tip}
+                          onChange={(e) => setAracBilgileri({ ...aracBilgileri, tip: e.target.value })}
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        >
+                          <option value="">Segment Seçin</option>
+                          {fiyatlandirma.segmentler.map(segment => (
+                            <option key={segment.id} value={segment.id}>{segment.name}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        value={aracBilgileri.marka}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, marka: e.target.value, model: '' })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Marka Seçin</option>
-                        {vehicleData.aracMarkalari.map(marka => (
-                          <option key={marka} value={marka}>{marka}</option>
-                        ))}
-                      </select>
+                      <div>
+                        <label className="block text-sm text-[#404040] mb-1">Marka</label>
+                        <select
+                          value={aracBilgileri.marka}
+                          onChange={(e) => setAracBilgileri({ ...aracBilgileri, marka: e.target.value, model: '' })}
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        >
+                          <option value="">Marka Seçin</option>
+                          {vehicleData.aracMarkalari.map(marka => (
+                            <option key={marka} value={marka}>{marka}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        value={aracBilgileri.model}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, model: e.target.value })}
-                        disabled={!aracBilgileri.marka}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent disabled:opacity-50"
-                      >
-                        <option value="">Model Seçin</option>
-                        {aracBilgileri.marka && vehicleData.aracModelleri[aracBilgileri.marka]?.map(model => (
-                          <option key={model} value={model}>{model}</option>
-                        ))}
-                      </select>
+                      <div>
+                        <label className="block text-sm text-[#404040] mb-1">Model</label>
+                        <select
+                          value={aracBilgileri.model}
+                          onChange={(e) => setAracBilgileri({ ...aracBilgileri, model: e.target.value })}
+                          disabled={!aracBilgileri.marka}
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent disabled:opacity-50"
+                        >
+                          <option value="">Model Seçin</option>
+                          {aracBilgileri.marka && vehicleData.aracModelleri[aracBilgileri.marka]?.map(model => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        value={aracBilgileri.yil}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, yil: e.target.value })}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      >
-                        <option value="">Yıl Seçin</option>
-                        {vehicleData.yillar.map(yil => (
-                          <option key={yil} value={yil}>{yil}</option>
-                        ))}
-                      </select>
+                      <div>
+                        <label className="block text-sm text-[#404040] mb-1">Yıl</label>
+                        <select
+                          value={aracBilgileri.yil}
+                          onChange={(e) => setAracBilgileri({ ...aracBilgileri, yil: e.target.value })}
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        >
+                          <option value="">Yıl Seçin</option>
+                          {vehicleData.yillar.map(yil => (
+                            <option key={yil} value={yil}>{yil}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <input
-                        type="text"
-                        value={aracBilgileri.plaka}
-                        onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value.toUpperCase() })}
-                        placeholder="Plaka"
-                        maxLength={8}
-                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                      />
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm text-[#404040] mb-1">Plaka</label>
+                        <input
+                          type="text"
+                          value={aracBilgileri.plaka}
+                          onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value.toUpperCase() })}
+                          placeholder="Plaka"
+                          maxLength={8}
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -495,18 +638,18 @@ export default function YolYardimModal({ onClose }) {
                     Arıza Tipi
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                    {(fiyatlandirma?.arizaTipleri || []).map(ariza => (
+                    {Object.entries(fiyatlandirma.arizaTipleri || {}).map(([id, ariza]) => (
                       <button
-                        key={ariza.id}
+                        key={id}
                         type="button"
-                        onClick={() => handleArizaSelect(ariza)}
+                        onClick={() => handleArizaSelect({ id, title: ariza.name })}
                         className={`p-2 rounded-lg border transition-colors ${
-                          selectedAriza?.id === ariza.id
+                          selectedAriza?.id === id
                             ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500'
                             : 'bg-[#141414] border-[#404040] text-[#404040] hover:bg-[#202020] hover:text-white'
                         }`}
                       >
-                        <div className="text-sm font-medium">{ariza.title}</div>
+                        <div className="text-sm font-medium">{ariza.name}</div>
                       </button>
                     ))}
                   </div>
@@ -524,38 +667,7 @@ export default function YolYardimModal({ onClose }) {
           ) : step === 2 ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Fiyat Teklifi */}
-                <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-white">Fiyat Teklifi</h3>
-                    <div className="text-3xl font-bold text-yellow-500">
-                      {price?.toLocaleString('tr-TR')} TL
-                    </div>
-                  </div>
-                  <div className="block text-sm">
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Araç</div>
-                      <div className="text-white font-medium truncate" title={`${aracBilgileri.marka} ${aracBilgileri.model} (${aracBilgileri.yil})`}>
-                        {aracBilgileri.marka} {aracBilgileri.model} ({aracBilgileri.yil})
-                      </div>
-                    </div>
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Plaka</div>
-                      <div className="text-white font-medium">{aracBilgileri.plaka}</div>
-                    </div>
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Arıza</div>
-                      <div className="text-white font-medium">{selectedAriza?.title}</div>
-                    </div>
-                    <div className="bg-[#202020] rounded-lg p-2 text-center">
-                      <div className="text-[#404040] text-xs">Konum</div>
-                      <div className="text-white font-medium text-xs" title={location?.address}>
-                        {location?.address}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+                {renderPriceOffer()}
                 {/* Rota ve Harita */}
                 <div className="bg-[#141414] rounded-lg border border-[#404040] overflow-hidden">
                   <div className="p-4">
@@ -737,45 +849,50 @@ export default function YolYardimModal({ onClose }) {
                         placeholder="Soyadınız"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#404040] mb-2">
-                        TC Kimlik No
-                      </label>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="tcVatandasi"
-                            checked={musteriBilgileri.tcVatandasi}
-                            onChange={(e) => {
-                              const newTcVatandasi = e.target.checked;
-                              setMusteriBilgileri({
-                                ...musteriBilgileri,
-                                tcVatandasi: newTcVatandasi,
-                                tcKimlik: newTcVatandasi ? '' : '11111111111'
-                              });
-                            }}
-                            className="w-4 h-4 rounded border-[#404040] bg-[#141414] text-yellow-500 focus:ring-yellow-500 focus:ring-offset-[#141414]"
-                          />
-                          <label htmlFor="tcVatandasi" className="text-sm text-[#404040]">
-                            TC Vatandaşıyım
+                    <div className="sm:col-span-2">
+                      <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="text-sm font-medium text-[#404040]">
+                            Kimlik Bilgileri
                           </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="tcVatandasi"
+                              checked={musteriBilgileri.tcVatandasi}
+                              onChange={(e) => {
+                                const newTcVatandasi = e.target.checked;
+                                setMusteriBilgileri({
+                                  ...musteriBilgileri,
+                                  tcVatandasi: newTcVatandasi,
+                                  tcKimlik: newTcVatandasi ? '' : '11111111111'
+                                });
+                              }}
+                              className="w-4 h-4 rounded border-[#404040] bg-[#141414] text-yellow-500 focus:ring-yellow-500 focus:ring-offset-[#141414]"
+                            />
+                            <label htmlFor="tcVatandasi" className="text-sm text-[#404040]">
+                              TC Vatandaşıyım
+                            </label>
+                          </div>
                         </div>
-                        {musteriBilgileri.tcVatandasi && (
+                        {musteriBilgileri.tcVatandasi ? (
                           <input
                             type="text"
                             value={musteriBilgileri.tcKimlik}
-                            onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, tcKimlik: e.target.value })}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                              setMusteriBilgileri({ ...musteriBilgileri, tcKimlik: value });
+                            }}
                             required
                             maxLength={11}
-                            className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 bg-[#202020] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                             placeholder="TC Kimlik No"
                           />
+                        ) : (
+                          <div className="w-full px-4 py-2.5 bg-[#202020] border border-[#404040] rounded-lg text-[#404040]">
+                            Yabancı Uyruklu
+                          </div>
                         )}
-                        <input
-                          type="hidden"
-                          value={musteriBilgileri.tcKimlik}
-                        />
                       </div>
                     </div>
                   </>

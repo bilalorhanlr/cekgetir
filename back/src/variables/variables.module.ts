@@ -2,33 +2,35 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VariablesController } from './variables.controller';
 import { VariablesService } from './variables.service';
+import { VariablesSeedService } from './variables-seed.service';
 import { 
-  SegmentKatsayilari,
-  MerkezKonum,
-  AracDurumu,
-  OtoparkKonumlari,
-  KmUcretleri,
-  AracAdediCarpani,
-  IlOzelCekiciUcretleri,
-  GenelAyarlar
+  CarSegment,
+  CarStatus,
+  YolYardim,
+  OzelCekici,
+  OzelCekiciSehir,
+  TopluCekiciSehir,
+  TopluCekiciKmFiyat,
+  TopluCekici
 } from './variables.entity';
 import { JwtAuthModule } from '../auth/jwt.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      SegmentKatsayilari,
-      MerkezKonum,
-      AracDurumu,
-      OtoparkKonumlari,
-      KmUcretleri,
-      AracAdediCarpani,
-      IlOzelCekiciUcretleri,
-      GenelAyarlar
+      CarSegment,
+      CarStatus,
+      YolYardim,
+      OzelCekici,
+      OzelCekiciSehir,
+      TopluCekiciSehir,
+      TopluCekiciKmFiyat,
+      TopluCekici
     ]),
     JwtAuthModule
   ],
   controllers: [VariablesController],
-  providers: [VariablesService],
+  providers: [VariablesService, VariablesSeedService],
+  exports: [VariablesService]
 })
 export class VariablesModule {} 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import OzelCekiciModal from './ozel-cekici'
 import TopluCekiciModal from './toplu-cekici'
 import api from '@/utils/axios'
-
+import axios from 'axios'
 export default function SehirlerArasiModal({ onClose }) {
   const [step, setStep] = useState(1)
   const [selectedService, setSelectedService] = useState(null)
@@ -33,10 +33,7 @@ export default function SehirlerArasiModal({ onClose }) {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const { data } = await api.get('/api/variables');
-        setFiyatlandirma(data.sehirlerArasi);
-
-        const vehicleResponse = await api.get('/data/arac-info.json');
+        const vehicleResponse = await axios.get('/data/arac-info.json');
         setVehicleData(vehicleResponse.data);
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
