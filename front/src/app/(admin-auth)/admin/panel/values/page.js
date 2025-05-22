@@ -173,6 +173,7 @@ export default function ValuesPage() {
     try {
       const response = await api.get('/api/variables/toplu-cekici/km-fiyatlar');
       setKmFiyatlar(response.data);
+      console.log('KM Bazlı Fiyatlandırma:', response.data);
     } catch (error) {
       console.error('Error fetching KM prices:', error);
     }
@@ -585,120 +586,109 @@ export default function ValuesPage() {
               .slice(0, showAllCities ? undefined : 4)
               .map((sehir) => (
                 <div key={sehir.id} className="bg-[#242424] rounded-lg p-4 border border-[#333333] hover:border-yellow-500/50 transition-all duration-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-300">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="text-lg font-medium text-white">
                       {sehir.sehirAdi}
                     </label>
                   </div>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.basePrice}
-                        onChange={(e) => {
-                          const newSehirler = topluCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, basePrice: Number(e.target.value) } : s
-                          );
-                          setTopluCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Temel Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.basePricePerKm}
-                        onChange={(e) => {
-                          const newSehirler = topluCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, basePricePerKm: Number(e.target.value) } : s
-                          );
-                          setTopluCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="KM Başı Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.ozelCekiciBasePrice}
-                        onChange={(e) => {
-                          const newSehirler = topluCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, ozelCekiciBasePrice: Number(e.target.value) } : s
-                          );
-                          setTopluCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Özel Çekici Temel Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.ozelCekiciBasePricePerKm}
-                        onChange={(e) => {
-                          const newSehirler = topluCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, ozelCekiciBasePricePerKm: Number(e.target.value) } : s
-                          );
-                          setTopluCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Özel Çekici KM Başı Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={sehir.otoparkAdres || ''}
-                        onChange={(e) => {
-                          const newSehirler = topluCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, otoparkAdres: e.target.value } : s
-                          );
-                          setTopluCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Otopark Adresi"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-4">
+                    {/* Base Ücret Bölümü */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#333333]">
+                      <h4 className="text-sm font-medium text-gray-300 mb-2">Base Ücret</h4>
                       <div className="relative">
                         <input
                           type="number"
-                          step="0.000001"
-                          value={sehir.otoparkLat || ''}
+                          value={sehir.basePrice}
                           onChange={(e) => {
                             const newSehirler = topluCekiciSehirler.map(s =>
-                              s.id === sehir.id ? { ...s, otoparkLat: Number(e.target.value) } : s
+                              s.id === sehir.id ? { ...s, basePrice: Number(e.target.value) } : s
                             );
                             setTopluCekiciSehirler(newSehirler);
                           }}
-                          className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                          placeholder="Enlem"
+                          className="w-full px-4 py-2 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                          placeholder="Base Ücret"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lat</span>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="0.000001"
-                          value={sehir.otoparkLng || ''}
-                          onChange={(e) => {
-                            const newSehirler = topluCekiciSehirler.map(s =>
-                              s.id === sehir.id ? { ...s, otoparkLng: Number(e.target.value) } : s
-                            );
-                            setTopluCekiciSehirler(newSehirler);
-                          }}
-                          className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                          placeholder="Boylam"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lng</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
                       </div>
                     </div>
+
+                    {/* KM Bilgileri Bölümü */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#333333]">
+                      <h4 className="text-sm font-medium text-gray-300 mb-2">KM Bilgileri</h4>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={sehir.basePricePerKm}
+                            onChange={(e) => {
+                              const newSehirler = topluCekiciSehirler.map(s =>
+                                s.id === sehir.id ? { ...s, basePricePerKm: Number(e.target.value) } : s
+                              );
+                              setTopluCekiciSehirler(newSehirler);
+                            }}
+                            className="w-full px-4 py-2 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                            placeholder="KM Başı Ücret"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺/km</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Otopark Bilgileri Bölümü */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#333333]">
+                      <h4 className="text-sm font-medium text-gray-300 mb-2">Otopark Bilgileri</h4>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={sehir.otoparkAdres || ''}
+                            onChange={(e) => {
+                              const newSehirler = topluCekiciSehirler.map(s =>
+                                s.id === sehir.id ? { ...s, otoparkAdres: e.target.value } : s
+                              );
+                              setTopluCekiciSehirler(newSehirler);
+                            }}
+                            className="w-full px-4 py-2 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                            placeholder="Otopark Adresi"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.000001"
+                              value={sehir.otoparkLat || ''}
+                              onChange={(e) => {
+                                const newSehirler = topluCekiciSehirler.map(s =>
+                                  s.id === sehir.id ? { ...s, otoparkLat: Number(e.target.value) } : s
+                                );
+                                setTopluCekiciSehirler(newSehirler);
+                              }}
+                              className="w-full px-4 py-2 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                              placeholder="Enlem"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lat</span>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.000001"
+                              value={sehir.otoparkLng || ''}
+                              onChange={(e) => {
+                                const newSehirler = topluCekiciSehirler.map(s =>
+                                  s.id === sehir.id ? { ...s, otoparkLng: Number(e.target.value) } : s
+                                );
+                                setTopluCekiciSehirler(newSehirler);
+                              }}
+                              className="w-full px-4 py-2 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                              placeholder="Boylam"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lng</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <button
                       onClick={() => handleTopluCekiciSehirUpdate(
                         sehir.sehirAdi,
@@ -841,7 +831,6 @@ export default function ValuesPage() {
                   <label className="text-sm font-medium text-gray-300">
                     {status.name}
                   </label>
-                  <span className="text-xs text-gray-500">Katsayı</span>
                 </div>
                 <div className="relative">
                   <input
@@ -938,6 +927,55 @@ export default function ValuesPage() {
               </div>
             </div>
           </div>
+
+          {/* Konum Bilgileri */}
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-white mb-4">Konum Bilgileri</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-[#242424] rounded-lg p-4 border border-[#333333]">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Enlem</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={variables.yolYardim.baseLat}
+                    onChange={(e) => {
+                      setVariables(prev => ({
+                        ...prev,
+                        yolYardim: {
+                          ...prev.yolYardim,
+                          baseLat: Number(e.target.value)
+                        }
+                      }));
+                    }}
+                    className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                    placeholder="Enlem değeri"
+                  />
+                </div>
+              </div>
+              <div className="bg-[#242424] rounded-lg p-4 border border-[#333333]">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Boylam</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={variables.yolYardim.baseLng}
+                    onChange={(e) => {
+                      setVariables(prev => ({
+                        ...prev,
+                        yolYardim: {
+                          ...prev.yolYardim,
+                          baseLng: Number(e.target.value)
+                        }
+                      }));
+                    }}
+                    className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
+                    placeholder="Boylam değeri"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Segment Kartı */}
@@ -994,7 +1032,6 @@ export default function ValuesPage() {
                   <label className="text-sm font-medium text-gray-300">
                     {status.name}
                   </label>
-                  <span className="text-xs text-gray-500">Katsayı</span>
                 </div>
                 <div className="relative">
                   <input
@@ -1121,85 +1158,7 @@ export default function ValuesPage() {
                         className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
                         placeholder="KM Başı Ücret"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.ozelCekiciBasePrice}
-                        onChange={(e) => {
-                          const newSehirler = ozelCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, ozelCekiciBasePrice: Number(e.target.value) } : s
-                          );
-                          setOzelCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Özel Çekici Temel Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={sehir.ozelCekiciBasePricePerKm}
-                        onChange={(e) => {
-                          const newSehirler = ozelCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, ozelCekiciBasePricePerKm: Number(e.target.value) } : s
-                          );
-                          setOzelCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Özel Çekici KM Başı Ücret"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={sehir.otoparkAdres || ''}
-                        onChange={(e) => {
-                          const newSehirler = ozelCekiciSehirler.map(s =>
-                            s.id === sehir.id ? { ...s, otoparkAdres: e.target.value } : s
-                          );
-                          setOzelCekiciSehirler(newSehirler);
-                        }}
-                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                        placeholder="Otopark Adresi"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="0.000001"
-                          value={sehir.otoparkLat || ''}
-                          onChange={(e) => {
-                            const newSehirler = ozelCekiciSehirler.map(s =>
-                              s.id === sehir.id ? { ...s, otoparkLat: Number(e.target.value) } : s
-                            );
-                            setOzelCekiciSehirler(newSehirler);
-                          }}
-                          className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                          placeholder="Enlem"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lat</span>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="0.000001"
-                          value={sehir.otoparkLng || ''}
-                          onChange={(e) => {
-                            const newSehirler = ozelCekiciSehirler.map(s =>
-                              s.id === sehir.id ? { ...s, otoparkLng: Number(e.target.value) } : s
-                            );
-                            setOzelCekiciSehirler(newSehirler);
-                          }}
-                          className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                          placeholder="Boylam"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Lng</span>
-                      </div>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">₺/km</span>
                     </div>
                     <button
                       onClick={() => handleOzelCekiciSehirUpdate(sehir.sehirAdi, sehir.basePrice, sehir.basePricePerKm)}
@@ -1279,7 +1238,6 @@ export default function ValuesPage() {
                   <label className="text-sm font-medium text-gray-300">
                     {status.name}
                   </label>
-                  <span className="text-xs text-gray-500">Katsayı</span>
                 </div>
                 <div className="relative">
                   <input

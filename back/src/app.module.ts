@@ -7,6 +7,7 @@ import { FaqModule } from './faq/faq.module';
 import { ContactModule } from './contact/contact.module';
 import { VariablesModule } from './variables/variables.module';
 import { JwtAuthModule } from './auth/jwt.module';
+import { OrderModule } from './order/order.module';
 import 'dotenv/config';
 
 @Module({
@@ -29,6 +30,7 @@ import 'dotenv/config';
     ContactModule,
     VariablesModule,
     JwtAuthModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -72,18 +72,42 @@ export default function SehirlerArasiModal({ onClose }) {
   // Sipariş oluşturma fonksiyonu
   const createOrder = async () => {
     try {
-      const { data } = await api.post('/api/orders', {
-        pickupCity: selectedPickupCity,
-        deliveryCity: selectedDeliveryCity,
-        vehicles: araclar,
+      const orderData = {
+        serviceType: selectedService === 'ozel' ? 'OZEL_CEKICI' : 'TOPLU_CEKICI',
+        vehicles: araclar.map(arac => ({
+          tip: arac.tip,
+          marka: arac.marka,
+          model: arac.model,
+          yil: arac.yil,
+          plaka: arac.plaka,
+          condition: arac.durum
+        })),
         price: toplamFiyat,
-        customerInfo: musteriBilgileri,
-        pickupLocation,
-        deliveryLocation,
-        routeInfo,
-        pickupOtopark,
-        deliveryOtopark
-      });
+        customerInfo: {
+          ad: musteriBilgileri.ad,
+          soyad: musteriBilgileri.soyad,
+          telefon: musteriBilgileri.telefon,
+          email: musteriBilgileri.email,
+          tcKimlik: musteriBilgileri.tcKimlik,
+          firmaAdi: musteriBilgileri.firmaAdi,
+          vergiNo: musteriBilgileri.vergiNo,
+          vergiDairesi: musteriBilgileri.vergiDairesi
+        },
+        pickupLocation: pickupLocation.address,
+        dropoffLocation: deliveryLocation.address,
+        isPickupFromParking: pickupOtopark ? true : false,
+        isDeliveryToParking: deliveryOtopark ? true : false,
+        specialNotes: ''
+      };
+
+      console.log('Gönderilen veri:', orderData);
+
+      const { data } = await api.post('/api/orders', orderData);
+      console.log('API yanıtı:', data);
+
+      if (!data.pnr) {
+        throw new Error('PNR numarası alınamadı');
+      }
 
       setPnrNumber(data.pnr);
       setStep(5);
@@ -94,6 +118,7 @@ export default function SehirlerArasiModal({ onClose }) {
       }
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error);
+      alert('Sipariş oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   };
 
@@ -237,6 +262,21 @@ export default function SehirlerArasiModal({ onClose }) {
               <TopluCekiciModal onClose={onClose} />
             )
           ) : null}
+
+          {step === 5 && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  window.location.href = `/pnr-sorgula?pnr=${pnrNumber}`;
+                }}
+                className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+              >
+                Tamam
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

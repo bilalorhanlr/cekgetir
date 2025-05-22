@@ -174,6 +174,7 @@ export default function TopluCekiciModal({ onClose }) {
   const [activeMapPanel, setActiveMapPanel] = useState(null)
   const [isLoadingTopluCekici, setIsLoadingTopluCekici] = useState(true)
   const [sehirler, setSehirler] = useState([])
+  const [kmBasedFees, setKmBasedFees] = useState([]);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -235,6 +236,20 @@ export default function TopluCekiciModal({ onClose }) {
     fetchSegmentsAndStatuses();
   }, []);
 
+  useEffect(() => {
+    const fetchKmFiyatlar = async () => {
+      try {
+        const response = await api.get('/api/variables/toplu-cekici/km-fiyatlar');
+        setKmBasedFees(response.data);
+        console.log('🚛 KM Fiyatları Yüklendi:', response.data);
+      } catch (error) {
+        console.error('KM fiyatları yüklenirken hata:', error);
+      }
+    };
+
+    fetchKmFiyatlar();
+  }, []);
+
   // Rota hesaplama fonksiyonu
   const calculateRoute = useCallback(async () => {
     if (!pickupLocation || !deliveryLocation || !window.google) return;
@@ -275,12 +290,14 @@ export default function TopluCekiciModal({ onClose }) {
   }, [pickupLocation, deliveryLocation, calculateRoute]);
 
   const getKmBasedPrice = (km, kmBasedFees) => {
-    if (!kmBasedFees) {
-      return km * 0.5; // Default price per km
-    }
-
-    const bracket = kmBasedFees.find(fee => km >= fee.fromKm && km < fee.toKm);
-    return bracket ? bracket.price : 0;
+    // Backend'den gelen KM fiyatlarına göre hesaplama
+    const fee = kmBasedFees.find(fee => km >= fee.minKm && km <= fee.maxKm);
+    console.log('🚛 KM Hesaplama Detayları:', {
+      mesafe: km,
+      bulunanFiyat: fee,
+      tumFiyatlar: kmBasedFees
+    });
+    return fee ? Number(fee.kmBasiUcret) : 0;
   };
 
   const calculateParkingFee = async (input) => {
@@ -332,169 +349,94 @@ export default function TopluCekiciModal({ onClose }) {
 
   const calculateTotalPrice = async (input) => {
     try {
-      const {
-        pickupLocation,
-        deliveryLocation,
-        pickupOtopark,
-        deliveryOtopark,
-        araclar,
-        sehirFiyatlandirma,
-        fiyatlandirma
-      } = input;
+      // Önce mesafeyi hesapla
+      let km = 0;
+      if (input.pickupLocation && input.deliveryLocation) {
+        km = await getDistanceBetween(input.pickupLocation, input.deliveryLocation);
+      }
 
-      // Tüm çekilen ve hesaplamada kullanılan değişkenleri logla
-      console.log('[FİYAT HESAPLAMA DEĞİŞKENLERİ]', {
-        pickupLocation,
-        deliveryLocation,
-        pickupOtopark,
-        deliveryOtopark,
-        araclar,
-        fiyatlandirma: {
-          topluCekici: {
-            basePrice: sehirFiyatlandirma?.basePrice,
-            basePricePerKm: sehirFiyatlandirma?.basePricePerKm,
-            otoparkLat: sehirFiyatlandirma?.otoparkLat,
-            otoparkLng: sehirFiyatlandirma?.otoparkLng
-          },
-          ozelCekici: {
-            basePrice: sehirFiyatlandirma?.ozelCekiciBasePrice,
-            basePricePerKm: sehirFiyatlandirma?.ozelCekiciBasePricePerKm
-          }
-        },
-        segmentler: vehicleData.segmentler,
-        durumlar: vehicleData.durumlar
+      console.log('🚛 Mesafe Hesaplama:', {
+        pickupLocation: input.pickupLocation,
+        deliveryLocation: input.deliveryLocation,
+        hesaplananKm: km
       });
 
-      if (!sehirFiyatlandirma || !fiyatlandirma) {
-        console.error('Missing pricing data:', { sehirFiyatlandirma, fiyatlandirma });
-        return 0;
-      }
+      console.log('🚛 Fiyat Hesaplama Başlangıç:', {
+        input,
+        sehirFiyatlandirma: input.sehirFiyatlandirma,
+        kmBasedFees,
+        hesaplananKm: km
+      });
 
-      let totalPrice = 0;
-      const detayLog = { stages: [] };
+      // Base price ve KM fiyatlarını al
+      const basePrice = Number(input.sehirFiyatlandirma.basePrice) || 0;
+      
+      // KM bazlı fiyatı hesapla
+      const kmBasedPrice = getKmBasedPrice(km, kmBasedFees);
+      const totalKmPrice = km * kmBasedPrice;
 
-      // 1. Eğer otoparka teslim değilse, konumdan otoparka özel çekici ücreti
-      if (!pickupOtopark && pickupLocation && isValidLatLng(sehirFiyatlandirma.otoparkLat, sehirFiyatlandirma.otoparkLng)) {
-        const pickupToParkingDistance = await getDistanceBetween(
-          pickupLocation,
-          {
-            lat: parseCoordinate(sehirFiyatlandirma.otoparkLat),
-            lng: parseCoordinate(sehirFiyatlandirma.otoparkLng)
-          }
-        );
-        const perVehicle = [];
-        for (const arac of araclar) {
-          const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
-          const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
-          const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
-          const statusMultiplier = statusObj ? Number(statusObj.price) : 1;
-          const basePrice = Number(sehirFiyatlandirma?.ozelCekiciBasePrice) || 0;
-          const distanceMultiplier = pickupToParkingDistance * (Number(sehirFiyatlandirma?.ozelCekiciBasePricePerKm) || 0);
-          const aracPrice = (basePrice + distanceMultiplier) * segmentMultiplier * statusMultiplier;
-          totalPrice += aracPrice;
-          perVehicle.push({
-            arac,
-            segmentMultiplier,
-            statusMultiplier,
-            basePrice,
-            pickupToParkingDistance,
-            distanceMultiplier,
-            aracPrice: Math.round(aracPrice)
-          });
-        }
-        detayLog.stages.push({
-          stage: 'Konumdan Otoparka',
-          pickupToParkingDistance,
-          perVehicle
+      console.log('🚛 KM Bazlı Hesaplama:', {
+        basePrice,
+        km,
+        kmBasedPrice,
+        totalKmPrice,
+        kmBasedFees
+      });
+
+      // Segment ve durum katsayılarını bul
+      let totalPrice = basePrice + totalKmPrice;
+
+      // Her araç için segment ve durum katsayılarını uygula
+      for (const arac of input.araclar) {
+        const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
+        const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
+        
+        const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
+        const statusMultiplier = statusObj ? Number(statusObj.price) : 0; // Durum fiyatını ekle olarak kullan
+
+        console.log('🚛 Araç Katsayıları:', {
+          arac,
+          segmentMultiplier,
+          statusMultiplier,
+          segmentObj,
+          statusObj
         });
-      } else if (!pickupOtopark && pickupLocation) {
-        console.error('Eksik pickup otopark koordinatları:', sehirFiyatlandirma);
-        return 0;
-      }
 
-      // 2. İki otopark arası toplu çekici ücreti
-      const deliveryOtoparkLat = getDeliveryOtoparkLat(sehirFiyatlandirma);
-      const deliveryOtoparkLng = getDeliveryOtoparkLng(sehirFiyatlandirma);
-      if (
-        isValidLatLng(sehirFiyatlandirma.otoparkLat, sehirFiyatlandirma.otoparkLng) &&
-        isValidLatLng(deliveryOtoparkLat, deliveryOtoparkLng)
-      ) {
-        const parkingToParkingDistance = await getDistanceBetween(
-          {
-            lat: parseCoordinate(sehirFiyatlandirma.otoparkLat),
-            lng: parseCoordinate(sehirFiyatlandirma.otoparkLng)
-          },
-          {
-            lat: parseCoordinate(deliveryOtoparkLat),
-            lng: parseCoordinate(deliveryOtoparkLng)
-          }
-        );
-        const basePrice = Number(sehirFiyatlandirma?.basePrice) || 0;
-        const distanceMultiplier = parkingToParkingDistance * (Number(sehirFiyatlandirma?.basePricePerKm) || 0);
-        const vehicleStatusMultiplier = araclar.reduce((total, arac) => {
-          const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
-          return total + (statusObj ? Number(statusObj.price) : 1);
-        }, 0) / araclar.length;
-        const topluCekiciPrice = (basePrice + distanceMultiplier) * vehicleStatusMultiplier;
-        totalPrice += topluCekiciPrice;
-        detayLog.stages.push({
-          stage: 'Otoparktan Otoparka',
-          parkingToParkingDistance,
-          basePrice,
-          distanceMultiplier,
-          vehicleStatusMultiplier,
-          topluCekiciPrice: Math.round(topluCekiciPrice)
+        // Araç bazlı fiyatı hesapla
+        const aracBasePrice = basePrice + totalKmPrice;
+        const aracPrice = (aracBasePrice * segmentMultiplier) + statusMultiplier; // Durum fiyatını ekle olarak kullan
+        totalPrice += aracPrice;
+
+        console.log('🚛 Araç Fiyat Hesaplama:', {
+          aracBasePrice,
+          segmentMultiplier,
+          statusMultiplier,
+          aracPrice
         });
-      } else {
-        console.error('Eksik delivery otopark koordinatları:', sehirFiyatlandirma);
-        return 0;
       }
 
-      // 3. Eğer konuma teslim edilecekse, otoparktan konuma özel çekici ücreti
-      if (!deliveryOtopark && deliveryLocation && isValidLatLng(deliveryOtoparkLat, deliveryOtoparkLng)) {
-        const parkingToDeliveryDistance = await getDistanceBetween(
-          {
-            lat: parseCoordinate(deliveryOtoparkLat),
-            lng: parseCoordinate(deliveryOtoparkLng)
-          },
-          deliveryLocation
-        );
-        const perVehicle = [];
-        for (const arac of araclar) {
-          const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
-          const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
-          const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
-          const statusMultiplier = statusObj ? Number(statusObj.price) : 1;
-          const basePrice = Number(sehirFiyatlandirma?.ozelCekiciBasePrice) || 0;
-          const distanceMultiplier = parkingToDeliveryDistance * (Number(sehirFiyatlandirma?.ozelCekiciBasePricePerKm) || 0);
-          const aracPrice = (basePrice + distanceMultiplier) * segmentMultiplier * statusMultiplier;
-          totalPrice += aracPrice;
-          perVehicle.push({
-            arac,
-            segmentMultiplier,
-            statusMultiplier,
-            basePrice,
-            parkingToDeliveryDistance,
-            distanceMultiplier,
-            aracPrice: Math.round(aracPrice)
-          });
-        }
-        detayLog.stages.push({
-          stage: 'Otoparktan Konuma',
-          parkingToDeliveryDistance,
-          perVehicle
+      // Gece ücreti varsa uygula
+      if (input.isNight) {
+        totalPrice *= input.nightPriceMultiplier;
+        console.log('🚛 Gece Ücreti Uygulandı:', {
+          nightPriceMultiplier: input.nightPriceMultiplier,
+          totalPriceAfterNight: totalPrice
         });
-      } else if (!deliveryOtopark && deliveryLocation) {
-        console.error('Eksik delivery otopark koordinatları (konuma teslim):', sehirFiyatlandirma);
-        return 0;
       }
 
-      detayLog.toplamFiyat = Math.round(totalPrice);
-      console.log('[FİYAT DETAY LOG]', detayLog);
+      console.log('🚛 Fiyat Hesaplama Sonuç:', {
+        basePrice,
+        totalKmPrice,
+        aracSayisi: input.araclar.length,
+        isNight: input.isNight,
+        nightPriceMultiplier: input.nightPriceMultiplier,
+        totalPrice
+      });
+
       return Math.round(totalPrice);
     } catch (error) {
-      console.error('Fiyat hesaplama hatası:', error);
-      return 0;
+      console.error('🚛 Fiyat hesaplama hatası:', error);
+      throw error;
     }
   };
 
@@ -653,18 +595,50 @@ export default function TopluCekiciModal({ onClose }) {
   // Sipariş oluşturma fonksiyonu
   const createOrder = async () => {
     try {
-      const { data } = await api.post('/api/orders', {
-        pickupCity: selectedPickupCity,
-        deliveryCity: selectedDeliveryCity,
-        vehicles: araclar,
+      // Müşteri bilgilerini hazırla
+      const customerInfo = {
+        ad: musteriBilgileri.ad,
+        soyad: musteriBilgileri.soyad,
+        telefon: musteriBilgileri.telefon,
+        email: musteriBilgileri.email,
+        tcKimlik: musteriBilgileri.tcKimlik || '11111111',
+        firmaAdi: musteriBilgileri.firmaAdi,
+        vergiNo: musteriBilgileri.vergiNo,
+        vergiDairesi: musteriBilgileri.vergiDairesi
+      };
+
+      // Araç bilgilerini hazırla - Backend'in beklediği formatta
+      const vehicles = araclar.map(arac => ({
+        tip: arac.segment,
+        marka: arac.marka,
+        model: arac.model,
+        yil: arac.yil,
+        plaka: arac.plaka,
+        condition: arac.durum
+      }));
+
+      // Sipariş verilerini hazırla
+      const orderData = {
+        serviceType: 'TOPLU_CEKICI',
+        customerInfo,
+        vehicles,
         price: toplamFiyat,
-        customerInfo: musteriBilgileri,
-        pickupLocation,
-        deliveryLocation,
-        routeInfo,
-        pickupOtopark,
-        deliveryOtopark
-      });
+        pickupLocation: pickupLocation.address,
+        dropoffLocation: deliveryLocation.address,
+        isPickupFromParking: pickupOtopark,
+        isDeliveryToParking: deliveryOtopark,
+        specialNotes: '',
+        numberOfVehicles: araclar.length
+      };
+
+      console.log('Gönderilen sipariş verisi:', orderData); // Debug için
+
+      // API'ye gönder
+      const { data } = await api.post('/api/orders', orderData);
+
+      if (!data || !data.pnr) {
+        throw new Error('PNR oluşturulamadı');
+      }
 
       setPnrNumber(data.pnr);
       setStep(5);
@@ -672,9 +646,24 @@ export default function TopluCekiciModal({ onClose }) {
       // PNR'ı localStorage'a kaydet
       if (typeof window !== 'undefined') {
         localStorage.setItem('lastPnr', data.pnr);
+        
+        // Sipariş bilgilerini kaydet
+        const orderInfo = {
+          pnr: data.pnr,
+          pickupCity: selectedPickupCity,
+          deliveryCity: selectedDeliveryCity,
+          vehicles,
+          price: toplamFiyat,
+          customerInfo,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(`order_${data.pnr}`, JSON.stringify(orderInfo));
       }
+
+      toast.success('Sipariş başarıyla oluşturuldu!');
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error);
+      toast.error('Sipariş oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
@@ -754,7 +743,8 @@ export default function TopluCekiciModal({ onClose }) {
       }
 
       const basePrice = Number(sehirFiyatlandirma.basePrice) || 0;
-      const kmPrice = Number(routeInfo.distance) * (Number(sehirFiyatlandirma.basePricePerKm) || 0);
+      const distanceInKm = routeInfo.distanceValue / 1000 ;
+      const kmPrice = distanceInKm * (Number(sehirFiyatlandirma.basePricePerKm));
       const totalPrice = basePrice + kmPrice;
 
       // Sadece toplamFiyat'ı güncelle
@@ -1744,13 +1734,18 @@ export default function TopluCekiciModal({ onClose }) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleClose}
-                className="w-full py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
-              >
-                Kapat
-              </button>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    window.location.href = `/pnr-sorgula?pnr=${pnrNumber}`;
+                  }}
+                  className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                >
+                  Tamam
+                </button>
+              </div>
             </div>
           )}
         </div>

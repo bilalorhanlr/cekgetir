@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import axios from 'axios'
 import Navbar from '@/components/Navbar'
-import Footer from '@/components/Footer'
 
 export default function PnrSorgula() {
   const [pnr, setPnr] = useState('')
@@ -18,7 +17,7 @@ export default function PnrSorgula() {
     setOrder(null)
 
     try {
-      const response = await axios.get(`/order/${pnr}`)
+      const response = await axios.get(`/api/orders/pnr/${pnr}`)
       setOrder(response.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Sipariş bulunamadı')
@@ -28,7 +27,7 @@ export default function PnrSorgula() {
   }
 
   return (
-    <div className="min-h-screen bg-[#141414] py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#141414] py-12 px-4 sm:px-6 lg:px-8 pt-32  ">
       <Navbar />
       
       <div className="max-w-md mx-auto">
@@ -73,53 +72,111 @@ export default function PnrSorgula() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-white">Sipariş Detayları</h2>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  order.status === 'onaylandi' ? 'bg-green-500/20 text-green-500' :
-                  order.status === 'beklemede' ? 'bg-yellow-500/20 text-yellow-500' :
-                  order.status === 'iptal' ? 'bg-red-500/20 text-red-500' :
+                  order.status === 'COMPLETED' ? 'bg-green-500/20 text-green-500' :
+                  order.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' :
+                  order.status === 'CANCELLED' ? 'bg-red-500/20 text-red-500' :
+                  order.status === 'IN_PROGRESS' ? 'bg-purple-500/20 text-purple-500' :
                   'bg-blue-500/20 text-blue-500'
                 }`}>
-                  {order.status === 'onaylandi' ? 'Onaylandı' :
-                   order.status === 'beklemede' ? 'Beklemede' :
-                   order.status === 'iptal' ? 'İptal' :
-                   'Tamamlandı'}
+                  {order.status === 'COMPLETED' ? 'Tamamlandı' :
+                   order.status === 'PENDING' ? 'Beklemede' :
+                   order.status === 'CANCELLED' ? 'İptal Edildi' :
+                   order.status === 'IN_PROGRESS' ? 'İşlemde' :
+                   'Onaylandı'}
                 </span>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <div className="text-[#404040] text-sm mb-1">PNR</div>
-                  <div className="text-white font-medium">{order.pnr}</div>
+                  <div className="text-white font-medium">{order.pnrNo}</div>
+                </div>
+
+                <div>
+                  <div className="text-[#404040] text-sm mb-1">Ödeme Durumu</div>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${
+                    order.paymentStatus === 'ODENDI' ? 'bg-green-500/20 text-green-500' :
+                    order.paymentStatus === 'IADE_EDILDI' ? 'bg-red-500/20 text-red-500' :
+                    'bg-yellow-500/20 text-yellow-500'
+                  }`}>
+                    {order.paymentStatus === 'ODENDI' ? 'Ödendi' :
+                     order.paymentStatus === 'IADE_EDILDI' ? 'İade Edildi' :
+                     'Ödenecek'}
+                  </div>
                 </div>
 
                 <div>
                   <div className="text-[#404040] text-sm mb-1">Araç Bilgileri</div>
-                  {order.vehicles.map((vehicle, index) => (
-                    <div key={index} className="text-white font-medium">
-                      {vehicle.marka} {vehicle.model} ({vehicle.yil}) - {vehicle.plaka}
+                  {order.serviceType === 'TOPLU_CEKICI' && order.bulkVehicles ? (
+                    <div className="space-y-4">
+                      {order.bulkVehicles.map((vehicle, index) => (
+                        <div key={vehicle.id} className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
+                          <div className="text-yellow-500 font-medium mb-2">Araç {index + 1}</div>
+                          <div className="space-y-2">
+                            <div className="text-white">
+                              <span className="text-[#404040]">Segment:</span> {vehicle.tip}
+                            </div>
+                            <div className="text-white">
+                              <span className="text-[#404040]">Marka:</span> {vehicle.marka}
+                            </div>
+                            <div className="text-white">
+                              <span className="text-[#404040]">Model:</span> {vehicle.model}
+                            </div>
+                            <div className="text-white">
+                              <span className="text-[#404040]">Yıl:</span> {vehicle.yil}
+                            </div>
+                            <div className="text-white">
+                              <span className="text-[#404040]">Plaka:</span> {vehicle.plaka}
+                            </div>
+                            <div className="text-white">
+                              <span className="text-[#404040]">Durum:</span> {vehicle.condition}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-white font-medium">
+                      {order.vehicleBrand} {order.vehicleModel} ({order.vehicleYear}) - {order.vehiclePlate}
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <div className="text-[#404040] text-sm mb-1">Konum</div>
                   <div className="text-white font-medium">
-                    {order.pickupCity} → {order.deliveryCity}
+                    {order.serviceType === 'YOL_YARDIM' ? (
+                      <>
+                        {order.breakdownLocation} → {order.destinationLocation}
+                      </>
+                    ) : (
+                      <>
+                        {order.pickupLocation} → {order.dropoffLocation}
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div>
                   <div className="text-[#404040] text-sm mb-1">Müşteri Bilgileri</div>
                   <div className="text-white font-medium">
-                    {order.customerInfo.musteriTipi === 'kisisel' ? (
+                    {order.companyName ? (
                       <>
-                        {order.customerInfo.ad} {order.customerInfo.soyad}
+                        {order.companyName}
+                        <div className="text-sm text-[#404040] mt-1">
+                          Vergi No: {order.taxNumber} | Vergi Dairesi: {order.taxOffice}
+                        </div>
                       </>
                     ) : (
-                      order.customerInfo.firmaAdi
+                      <>
+                        {order.customerName} {order.customerSurname}
+                      </>
                     )}
                   </div>
-                  <div className="text-white font-medium">{order.customerInfo.telefon}</div>
-                  <div className="text-white font-medium">{order.customerInfo.email}</div>
+                  <div className="text-white font-medium">{order.customerPhone}</div>
+                  {order.customerEmail && (
+                    <div className="text-white font-medium">{order.customerEmail}</div>
+                  )}
                 </div>
 
                 <div>
@@ -141,7 +198,6 @@ export default function PnrSorgula() {
         )}
       </div>
 
-      <Footer />
     </div>
   )
 } 

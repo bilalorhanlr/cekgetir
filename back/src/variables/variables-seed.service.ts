@@ -142,7 +142,11 @@ export class VariablesSeedService implements OnModuleInit {
                 console.log(`${sehir} için özel çekici fiyatlandırması zaten mevcut, atlanıyor...`);
             } catch (error) {
                 console.log(`${sehir} için özel çekici fiyatlandırması oluşturuluyor...`);
-                await this.variablesService.createOzelCekiciSehir(sehir, 1000, 15);
+                await this.variablesService.createOzelCekiciSehir(
+                    sehir, 
+                    1000, // basePrice
+                    15    // basePricePerKm
+                );
                 console.log(`${sehir} için özel çekici fiyatlandırması oluşturuldu`);
             }
         }

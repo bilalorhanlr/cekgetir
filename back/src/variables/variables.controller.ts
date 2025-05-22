@@ -157,6 +157,7 @@ export class VariablesController {
       baseLat: number;
       basePricePerKm: number;
       nightPrice: number;
+      baseAddress?: string;
     }
   ) {
     return await this.variablesService.createYolYardim(
@@ -164,7 +165,7 @@ export class VariablesController {
       createDto.baseLng,
       createDto.baseLat,
       createDto.basePricePerKm,
-      createDto.nightPrice  
+      createDto.nightPrice
     );
   }
 
@@ -177,6 +178,7 @@ export class VariablesController {
       baseLat: number;
       basePricePerKm: number;
       nightPrice: number;
+      baseAddress?: string;
     }
   ) {
     return await this.variablesService.updateYolYardim(

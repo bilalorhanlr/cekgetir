@@ -1,0 +1,119 @@
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { BulkVehicle } from './bulk-vehicle.entity';
+
+@Entity('orders')
+export class Order {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  // Müşteri Bilgileri
+  @Column()
+  customerName: string;
+
+  @Column()
+  customerSurname: string;
+
+  @Column({ nullable: true, default: '11111111' })
+  customerTc: string;
+
+  @Column()
+  customerPhone: string;
+
+  @Column({ nullable: true })
+  customerEmail: string;
+
+  // Kurum Bilgileri
+  @Column({ nullable: true })
+  companyName: string;
+
+  @Column({ nullable: true })
+  taxNumber: string;
+
+  @Column({ nullable: true })
+  taxOffice: string;
+
+  @Column({ nullable: true })
+  companyPhone: string;
+
+  @Column({ nullable: true })
+  companyEmail: string;
+
+  // Sipariş Bilgileri
+  @Column()
+  pnrNo: string;
+
+  @Column({ type: 'enum', enum: ['YOL_YARDIM', 'OZEL_CEKICI', 'TOPLU_CEKICI'], default: 'YOL_YARDIM' })
+  serviceType: 'YOL_YARDIM' | 'OZEL_CEKICI' | 'TOPLU_CEKICI';
+
+  @Column({ nullable: true })
+  faultType: string;
+
+  // Yol Yardım için konum bilgileri
+  @Column({ nullable: true })
+  breakdownLocation: string;
+
+  @Column({ nullable: true })
+  breakdownDescription: string;
+
+  @Column({ nullable: true })
+  destinationLocation: string;
+
+  // Özel ve Toplu Çekici için konum bilgileri
+  @Column({ nullable: true })
+  pickupLocation: string;
+
+  @Column({ nullable: true })
+  dropoffLocation: string;
+
+  @Column({ type: 'boolean', default: false })
+  isPickupFromParking: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isDeliveryToParking: boolean;
+
+  @Column({ nullable: true })
+  specialNotes: string;
+
+  // Araç Bilgileri
+  @Column({ nullable: true })
+  vehicleSegment: string;
+
+  @Column({ nullable: true })
+  vehicleBrand: string;
+
+  @Column({ nullable: true })
+  vehicleModel: string;
+
+  @Column({ nullable: true })
+  vehicleYear: string;
+
+  @Column({ nullable: true })
+  vehiclePlate: string;
+
+  @Column({ nullable: true })
+  vehicleCondition: string;
+
+  @Column({ type: 'int', default: 1 })
+  numberOfVehicles: number;
+
+  @OneToMany(() => BulkVehicle, bulkVehicle => bulkVehicle.order)
+  bulkVehicles: BulkVehicle[];
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  price: number;
+
+  @Column({ type: 'enum', enum: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], default: 'PENDING' })
+  status: 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+  @Column({ type: 'enum', enum: ['ODENDI', 'ODENECEK', 'IADE_EDILDI'], default: 'ODENECEK' })
+  paymentStatus: 'ODENDI' | 'ODENECEK' | 'IADE_EDILDI';
+
+  @Column({ nullable: true })
+  assignedDriverId: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+} 

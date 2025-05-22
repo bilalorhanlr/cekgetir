@@ -21,7 +21,6 @@ export default function AdminNavbar() {
   const navLinks = [
     { href: '/admin/panel/values', label: 'Değişkenler' },
     { href: '/admin/panel/orders', label: 'Siparişler' },
-    { href: '/admin/panel/approvals', label: 'Onay/Red' },
     { href: '/admin/panel/faq', label: 'SSS' },
     { href: '/admin/panel/contact', label: 'İletişim' }
   ]

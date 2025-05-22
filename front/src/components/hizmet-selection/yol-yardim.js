@@ -81,7 +81,7 @@ export default function YolYardimModal({ onClose }) {
   // Fiyat hesaplama fonksiyonu
   const calculatePrice = useCallback(() => {
     // Gerekli kontroller
-    if (!pickupLocation || !deliveryLocation || !aracBilgileri.tip || !aracBilgileri.durum) {
+    if (!location || !aracBilgileri.tip || !selectedAriza || !routeInfo) {
       setPrice(0);
       return;
     }
@@ -96,8 +96,11 @@ export default function YolYardimModal({ onClose }) {
     const segmentObj = fiyatlandirma?.segmentler?.find(seg => String(seg.id) === String(aracBilgileri.tip));
     const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
 
-    // Ara toplam hesaplama
-    const baseTotal = basePrice + (distance * basePricePerKm);
+    // Arıza ücreti
+    const arizaFiyat = fiyatlandirma?.arizaTipleri?.[selectedAriza.id]?.price || 0;
+
+    // Ara toplam hesaplama (arıza ücreti toplama olarak ekleniyor)
+    const baseTotal = basePrice + (distance * basePricePerKm) + arizaFiyat;
 
     // Segment çarpanı uygulaması
     const segmentTotal = baseTotal * segmentMultiplier;
@@ -107,8 +110,21 @@ export default function YolYardimModal({ onClose }) {
     const isNightTime = currentHour >= 22 || currentHour < 8;
     const finalPrice = isNightTime ? segmentTotal * nightPrice : segmentTotal;
 
+    console.log('Fiyat Hesaplama Detayları:', {
+      basePrice,
+      basePricePerKm,
+      distance,
+      nightPrice,
+      segmentMultiplier,
+      arizaFiyat,
+      baseTotal,
+      segmentTotal,
+      isNightTime,
+      finalPrice
+    });
+
     setPrice(Math.round(finalPrice));
-  }, [fiyatlandirma, pickupLocation, deliveryLocation, aracBilgileri.tip, routeInfo.distance]);
+  }, [fiyatlandirma, location, aracBilgileri.tip, selectedAriza, routeInfo]);
 
   // Fiyat detaylarını göster
   const renderPriceDetails = () => {
@@ -126,31 +142,29 @@ export default function YolYardimModal({ onClose }) {
     return (
       <div className="space-y-2 text-sm">
         <div className="flex justify-between text-[#404040]">
-          <span>Base Ücret:</span>
-          <span>{baseUcret.toLocaleString('tr-TR')} TL</span>
+          <span>Araç Markası:</span>
+          <span>{aracBilgileri.marka}</span>
         </div>
         <div className="flex justify-between text-[#404040]">
-          <span>KM Ücreti ({routeInfo.distance.toFixed(1)} km):</span>
-          <span>{kmUcreti.toLocaleString('tr-TR')} TL</span>
+          <span>Araç Modeli:</span>
+          <span>{aracBilgileri.model}</span>
         </div>
         <div className="flex justify-between text-[#404040]">
-          <span>Arıza Ücreti:</span>
-          <span>{arizaFiyat.toLocaleString('tr-TR')} TL</span>
+          <span>Araç Yılı:</span>
+          <span>{aracBilgileri.yil}</span>
         </div>
         <div className="flex justify-between text-[#404040]">
-          <span>Ara Toplam:</span>
-          <span>{araToplam.toLocaleString('tr-TR')} TL</span>
+          <span>Plaka:</span>
+          <span>{aracBilgileri.plaka}</span>
         </div>
         <div className="flex justify-between text-[#404040]">
-          <span>Segment Çarpanı ({katsayi}x):</span>
-          <span>+{segmentUcreti.toLocaleString('tr-TR')} TL</span>
+          <span>Mesafe:</span>
+          <span>{routeInfo.distance.toFixed(1)} km</span>
         </div>
-        {(currentHour >= 22 || currentHour < 6) && (
-          <div className="flex justify-between text-[#404040]">
-            <span>Gece Ücreti ({fiyatlandirma.nightPrice}x):</span>
-            <span>+{geceUcreti.toLocaleString('tr-TR')} TL</span>
-          </div>
-        )}
+        <div className="flex justify-between text-[#404040]">
+          <span>Arıza Tipi:</span>
+          <span>{selectedAriza.name}</span>
+        </div>
         <div className="flex justify-between text-white font-medium pt-2 border-t border-[#404040]">
           <span>Toplam:</span>
           <span>{price.toLocaleString('tr-TR')} TL</span>
@@ -191,6 +205,12 @@ export default function YolYardimModal({ onClose }) {
       console.warn('Google Maps API henüz yüklenmedi');
       return;
     }
+
+    console.log('Rota hesaplama başlıyor:', {
+      origin,
+      destination,
+      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.substring(0, 10) + '...'
+    });
     
     const directionsService = new window.google.maps.DirectionsService();
     const request = {
@@ -199,27 +219,36 @@ export default function YolYardimModal({ onClose }) {
       travelMode: window.google.maps.TravelMode.DRIVING
     };
     
-    directionsService.route(request, (result, status) => {
-      if (status === 'OK') {
-        const route = result.routes[0];
-        const distance = route.legs[0].distance.value / 1000; // km
-        const duration = route.legs[0].duration.value / 60; // dk
-        
-        setDirections(result);
-        setRouteInfo({
-          distance,
-          duration,
-          steps: route.legs[0].steps.map(step => ({
-            instruction: step.instructions,
-            distance: step.distance.text,
-            duration: step.duration.text
-          }))
+    try {
+      const result = await new Promise((resolve, reject) => {
+        directionsService.route(request, (result, status) => {
+          if (status === 'OK') {
+            resolve(result);
+          } else {
+            reject(new Error(`Directions request failed: ${status}`));
+          }
         });
-        calculatePrice();
-      } else {
-        console.error('Rota hesaplanırken bir hata oluştu:', status);
-      }
-    });
+      });
+
+      const route = result.routes[0];
+      const distance = route.legs[0].distance.value / 1000; // km
+      const duration = route.legs[0].duration.value / 60; // dk
+      
+      setDirections(result);
+      setRouteInfo({
+        distance,
+        duration,
+        steps: route.legs[0].steps.map(step => ({
+          instruction: step.instructions,
+          distance: step.distance.text,
+          duration: step.duration.text
+        }))
+      });
+      calculatePrice();
+    } catch (error) {
+      console.error('Rota hesaplama hatası:', error);
+      setError('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
+    }
   }, [fiyatlandirma, calculatePrice]);
 
   // Arıza seçildiğinde fiyat hesaplama
@@ -414,8 +443,6 @@ export default function YolYardimModal({ onClose }) {
         return;
       }
 
-      setStep(4);
-    } else if (step === 4) {
       if (musteriBilgileri.musteriTipi === 'kisisel') {
         if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
           alert('Lütfen tüm zorunlu alanları doldurun');
@@ -438,28 +465,52 @@ export default function YolYardimModal({ onClose }) {
 
   const createOrder = async () => {
     try {
-      const { data } = await api.post('/api/orders', {
-        pickupCity: location?.address,
-        deliveryCity: location?.address,
-        vehicles: [aracBilgileri],
+      const orderData = {
+        serviceType: 'YOL_YARDIM',
+        faultType: selectedAriza?.id,
+        breakdownLocation: location?.address,
+        breakdownDescription: selectedAriza?.title,
+        destinationLocation: location?.address,
+        vehicles: [{
+          tip: aracBilgileri.tip,
+          marka: aracBilgileri.marka,
+          model: aracBilgileri.model,
+          yil: aracBilgileri.yil,
+          plaka: aracBilgileri.plaka,
+          condition: aracBilgileri.condition
+        }],
         price: price,
-        customerInfo: musteriBilgileri,
-        pickupLocation: location,
-        deliveryLocation: location,
-        routeInfo,
-        pickupOtopark: '',
-        deliveryOtopark: '',
-        faultType: selectedAriza.id
-      });
+        customerInfo: {
+          ad: musteriBilgileri.ad,
+          soyad: musteriBilgileri.soyad,
+          tcKimlik: musteriBilgileri.tcKimlik,
+          telefon: musteriBilgileri.telefon,
+          email: musteriBilgileri.email,
+          firmaAdi: musteriBilgileri.firmaAdi,
+          vergiNo: musteriBilgileri.vergiNo,
+          vergiDairesi: musteriBilgileri.vergiDairesi
+        }
+      };
 
-      setPnrNumber(data.pnr);
-      setStep(5);
+      console.log('Gönderilen veri:', orderData);
 
-      // PNR'ı localStorage'a kaydet
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('lastPnr', data.pnr);
+      const response = await api.post('api/orders', orderData);
+      console.log('API yanıtı:', response);
+
+      if (!response.data || !response.data.pnr) {
+        throw new Error('PNR alınamadı!');
       }
+
+      setPnrNumber(response.data.pnr);
+      console.log('PNR:', response.data.pnr);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastPnr', response.data.pnr);
+      }
+
+      setStep(4);
     } catch (error) {
+      alert('Sipariş oluşturulurken hata: ' + (error?.message || ''));
       console.error('Sipariş oluşturma hatası:', error);
     }
   };
@@ -482,7 +533,7 @@ export default function YolYardimModal({ onClose }) {
 
         <div className="p-6">
           <h2 className="text-2xl font-bold text-white mb-6">
-            {step === 1 ? 'Yol Yardım Talebi' : step === 2 ? 'Fiyat Teklifi' : step === 3 ? 'Sipariş Onayı' : 'Sipariş Tamamlandı'}
+            {step === 1 ? 'Yol Yardım Talebi' : step === 2 ? 'Fiyat Teklifi' : step === 3 ? 'Müşteri Bilgileri' : 'Sipariş Tamamlandı'}
           </h2>
 
           {step === 1 ? (
@@ -959,7 +1010,10 @@ export default function YolYardimModal({ onClose }) {
                 </p>
                 <div className="bg-[#141414] rounded-lg p-4 mb-4">
                   <div className="text-[#404040] text-sm mb-1">PNR Numaranız</div>
-                  <div className="text-2xl font-bold text-yellow-500">{pnrNumber}</div>
+                  <div className="text-3xl font-bold text-yellow-500 tracking-wider">{pnrNumber || 'Yükleniyor...'}</div>
+                  <div className="text-[#404040] text-xs mt-2">
+                    Bu numarayı kullanarak siparişinizi takip edebilirsiniz
+                  </div>
                 </div>
               </div>
 
@@ -1044,7 +1098,10 @@ export default function YolYardimModal({ onClose }) {
               <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => {
+                    onClose();
+                    window.location.href = `/pnr-sorgula?pnr=${pnrNumber}`;
+                  }}
                   className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                 >
                   Tamam

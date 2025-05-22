@@ -202,12 +202,12 @@ export default function OzelCekiciModal({ onClose }) {
     const segmentObj = pricingData?.segments?.find(seg => String(seg.id) === String(aracBilgileri.tip));
     const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
     
-    // Araç durumuna göre durum katsayısı (diziden bul)
+    // Araç durumuna göre durum ücreti (diziden bul)
     const statusObj = pricingData?.statuses?.find(st => String(st.id) === String(aracBilgileri.durum));
-    const statusMultiplier = statusObj ? Number(statusObj.price) : 1;
+    const statusPrice = statusObj ? Number(statusObj.price) : 0;
     
-    // Toplam fiyat hesaplama
-    const totalPrice = (basePrice + distanceMultiplier) * segmentMultiplier * statusMultiplier * nightMultiplier;
+    // Toplam fiyat hesaplama (durum ücreti toplama olarak ekleniyor)
+    const totalPrice = ((basePrice + distanceMultiplier + statusPrice) * segmentMultiplier) * nightMultiplier;
     setPrice(Math.round(totalPrice));
   }, [pickupLocation, deliveryLocation, aracBilgileri, routeInfo, pricingData, sehirFiyatlandirma]);
 
@@ -398,14 +398,42 @@ export default function OzelCekiciModal({ onClose }) {
   // Sipariş oluşturma fonksiyonu
   const createOrder = async () => {
     try {
-      const { data } = await api.post('/api/orders', {
-        vehicles: [aracBilgileri],
+      const orderData = {
+        serviceType: 'OZEL_CEKICI',
+        vehicles: [{
+          tip: aracBilgileri.tip,
+          marka: aracBilgileri.marka,
+          model: aracBilgileri.model,
+          yil: aracBilgileri.yil,
+          plaka: aracBilgileri.plaka,
+          condition: aracBilgileri.durum
+        }],
         price,
-        customerInfo: musteriBilgileri,
-        pickupLocation,
-        deliveryLocation,
-        routeInfo
-      });
+        customerInfo: {
+          ad: musteriBilgileri.ad,
+          soyad: musteriBilgileri.soyad,
+          telefon: musteriBilgileri.telefon,
+          email: musteriBilgileri.email,
+          tcKimlik: musteriBilgileri.tcKimlik,
+          firmaAdi: musteriBilgileri.firmaAdi,
+          vergiNo: musteriBilgileri.vergiNo,
+          vergiDairesi: musteriBilgileri.vergiDairesi
+        },
+        pickupLocation: pickupLocation.address,
+        dropoffLocation: deliveryLocation.address,
+        isPickupFromParking: false,
+        isDeliveryToParking: false,
+        specialNotes: ''
+      };
+
+      console.log('Gönderilen veri:', orderData);
+
+      const { data } = await api.post('/api/orders', orderData);
+      console.log('API yanıtı:', data);
+
+      if (!data.pnr) {
+        throw new Error('PNR numarası alınamadı');
+      }
 
       setPnrNumber(data.pnr);
       setStep(4);
@@ -416,11 +444,12 @@ export default function OzelCekiciModal({ onClose }) {
       }
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error);
+      alert('Sipariş oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   };
 
   const renderAracBilgileri = () => (
-    <div className="space-y-4">zz
+    <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-[#404040] mb-2">
@@ -1125,7 +1154,10 @@ export default function OzelCekiciModal({ onClose }) {
               <div className="flex justify-center">
                 <button
                   type="button"
-                  href="/pnr-sorgula"
+                  onClick={() => {
+                    onClose();
+                    window.location.href = `/pnr-sorgula?pnr=${pnrNumber}`;
+                  }}
                   className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                 >
                   Tamam
