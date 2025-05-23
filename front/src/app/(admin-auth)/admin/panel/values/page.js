@@ -23,7 +23,7 @@ export default function ValuesPage() {
       segmentler: []
     },
     yolYardim: {
-      id: 0,
+      id: 1,
       basePrice: 0,
       baseLng: 29.1267,
       baseLat: 40.9877,
@@ -35,7 +35,7 @@ export default function ValuesPage() {
         motorArizasi: 0,
         lastikArizasi: 0
       },
-      segmentler: {}
+      segmentler: []
     },
     ozelCekici: {
       id: 0,

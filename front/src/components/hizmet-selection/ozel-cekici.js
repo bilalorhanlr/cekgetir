@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { GoogleMap, Marker, useLoadScript, DirectionsRenderer } from '@react-google-maps/api'
 import api from '@/utils/axios'
 import axios from 'axios'
+import { toast } from 'react-hot-toast'
 
 const libraries = ['places']
 
@@ -354,27 +355,64 @@ export default function OzelCekiciModal({ onClose }) {
 
   // Konumumu kullan
   const handleCurrentLocation = useCallback((target) => {
-    if (navigator.geolocation) {
+    if (!navigator.geolocation) {
+      toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
+      return;
+    }
+
+    // Önce izinleri kontrol et
+    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+      if (permissionStatus.state === 'denied') {
+        toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
+        return;
+      }
+
+      // Konum alma işlemini başlat
+      toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords
-          const address = await getAddressFromLatLng(latitude, longitude)
-          const newLocation = { lat: latitude, lng: longitude, address }
+          const { latitude, longitude } = position.coords;
+          const address = await getAddressFromLatLng(latitude, longitude);
+          const newLocation = { lat: latitude, lng: longitude, address };
+          
           if (target === 'pickup') {
-            setPickupLocation(newLocation)
-            setPickupSearchValue(address)
+            setPickupLocation(newLocation);
+            setPickupSearchValue(address);
           } else {
-            setDeliveryLocation(newLocation)
-            setDeliverySearchValue(address)
+            setDeliveryLocation(newLocation);
+            setDeliverySearchValue(address);
           }
-          setActiveMapPanel(null) // Konum seçilince harita kapansın
+          setActiveMapPanel(null);
+          
+          toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
         },
         (error) => {
-          console.error('Geolocation error:', error)
+          console.error('Geolocation error:', error);
+          let errorMessage = 'Konum alınamadı.';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
+              break;
+          }
+          
+          toast.error(errorMessage, { id: 'location' });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
-      )
-    }
-  }, [])
+      );
+    });
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

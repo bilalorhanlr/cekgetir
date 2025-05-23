@@ -939,38 +939,74 @@ export default function TopluCekiciModal({ onClose }) {
   }
 
   const handleCurrentLocation = async (target) => {
-    if (navigator.geolocation) {
+    if (!navigator.geolocation) {
+      toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
+      return;
+    }
+
+    // Önce izinleri kontrol et
+    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+      if (permissionStatus.state === 'denied') {
+        toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
+        return;
+      }
+
+      // Konum alma işlemini başlat
+      toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords
-          const address = await getAddressFromLatLng(latitude, longitude)
-          const newLocation = { lat: latitude, lng: longitude, address }
+          const { latitude, longitude } = position.coords;
+          const address = await getAddressFromLatLng(latitude, longitude);
+          const newLocation = { lat: latitude, lng: longitude, address };
 
           // Şehir tespiti yap
-          const detectedCity = await sehirTespiti(newLocation)
-          console.log('📍 Tespit edilen şehir:', detectedCity)
+          const detectedCity = await sehirTespiti(newLocation);
+          console.log('📍 Tespit edilen şehir:', detectedCity);
 
           if (target === 'pickup') {
-            setLocationWithValidation(setPickupLocation, newLocation)
-            setPickupSearchValue(address)
+            setLocationWithValidation(setPickupLocation, newLocation);
+            setPickupSearchValue(address);
             if (detectedCity) {
-              setSelectedPickupCity(detectedCity)
+              setSelectedPickupCity(detectedCity);
             }
           } else {
-            setLocationWithValidation(setDeliveryLocation, newLocation)
-            setDeliverySearchValue(address)
+            setLocationWithValidation(setDeliveryLocation, newLocation);
+            setDeliverySearchValue(address);
             if (detectedCity) {
-              setSelectedDeliveryCity(detectedCity)
+              setSelectedDeliveryCity(detectedCity);
             }
           }
-          setActiveMapPanel(null)
+          setActiveMapPanel(null);
+          
+          toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
         },
         (error) => {
-          console.error('Geolocation error:', error)
+          console.error('Geolocation error:', error);
+          let errorMessage = 'Konum alınamadı.';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
+              break;
+          }
+          
+          toast.error(errorMessage, { id: 'location' });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
-      )
-    }
-  }
+      );
+    });
+  };
 
   const handleClose = () => {
     if (pnrNumber) {
@@ -1032,7 +1068,7 @@ export default function TopluCekiciModal({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141414]/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-[2px]">
       <div className="relative bg-[#202020]/95 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <button
           onClick={handleClose}

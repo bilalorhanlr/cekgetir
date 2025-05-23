@@ -228,15 +228,7 @@ export class VariablesService {
     async findYolYardim(): Promise<YolYardim> {
         const yolYardim = await this.yolYardimRepository.findOne({ where: { id: 1 } });
         if (!yolYardim) {
-            // Return default values if no configuration exists
-            return {
-                id: 1,
-                basePrice: 1200,
-                baseLng: 29.1267,
-                baseLat: 40.9877,
-                basePricePerKm: 15,
-                nightPrice: 1.5
-            };
+            throw new NotFoundException('YolYardim configuration not found');
         }
         return yolYardim;
     }

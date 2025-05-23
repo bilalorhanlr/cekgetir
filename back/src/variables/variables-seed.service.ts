@@ -1,21 +1,10 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { VariablesService } from './variables.service';
 import { CarStatusType } from './car-status-type';
 
 @Injectable()
-export class VariablesSeedService implements OnModuleInit {
+export class VariablesSeedService {
     constructor(private readonly variablesService: VariablesService) {}
-
-    async onModuleInit() {
-        await this.seedCarSegments();
-        await this.seedCarStatuses();
-        await this.seedYolYardim();
-        await this.seedOzelCekici();
-        await this.seedOzelCekiciSehirler();
-        await this.seedTopluCekiciSehirler();
-        await this.seedTopluCekiciKmFiyatlar();
-        await this.seedTopluCekici();
-    }
 
     private async seedCarSegments() {
         const defaultSegments = [
@@ -139,15 +128,12 @@ export class VariablesSeedService implements OnModuleInit {
         for (const sehir of sehirler) {
             try {
                 await this.variablesService.findOzelCekiciSehirBySehirAdi(sehir);
-                console.log(`${sehir} için özel çekici fiyatlandırması zaten mevcut, atlanıyor...`);
             } catch (error) {
-                console.log(`${sehir} için özel çekici fiyatlandırması oluşturuluyor...`);
                 await this.variablesService.createOzelCekiciSehir(
                     sehir, 
                     1000, // basePrice
                     15    // basePricePerKm
                 );
-                console.log(`${sehir} için özel çekici fiyatlandırması oluşturuldu`);
             }
         }
     }
@@ -167,9 +153,8 @@ export class VariablesSeedService implements OnModuleInit {
         for (const sehir of sehirler) {
             try {
                 await this.variablesService.findTopluCekiciSehirBySehirAdi(sehir);
-                console.log(`${sehir} için toplu çekici fiyatlandırması zaten mevcut, atlanıyor...`);
+
             } catch (error) {
-                console.log(`${sehir} için toplu çekici fiyatlandırması oluşturuluyor...`);
                 await this.variablesService.createTopluCekiciSehir(
                     sehir, 
                     1000, // basePrice
@@ -178,7 +163,6 @@ export class VariablesSeedService implements OnModuleInit {
                     undefined, // otoparkLng
                     undefined  // otoparkAdres
                 );
-                console.log(`${sehir} için toplu çekici fiyatlandırması oluşturuldu`);
             }
         }
     }

@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Order } from './order.entity';
 import { BulkVehicle } from './bulk-vehicle.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { SmsService } from '../common/sms/services/sms.service';
+import { EmailService } from '../common/email/email.service';
 
 @Injectable()
 export class OrderService {
@@ -12,6 +14,8 @@ export class OrderService {
     private orderRepository: Repository<Order>,
     @InjectRepository(BulkVehicle)
     private bulkVehicleRepository: Repository<BulkVehicle>,
+    private smsService: SmsService,
+    private emailService: EmailService,
   ) {}
 
   private generatePNR(): string {
@@ -28,6 +32,7 @@ export class OrderService {
   async create(orderData: any): Promise<Order> {
     const pnr = this.generatePNR();
     console.log('Creating order with PNR:', pnr);
+    console.log('Order data received:', JSON.stringify(orderData, null, 2));
     
     // Ana sipariş verilerini oluştur
     const order = this.orderRepository.create({
@@ -87,6 +92,16 @@ export class OrderService {
         console.log('Bulk vehicles saved successfully');
       }
 
+      // SMS gönder
+      try {
+        console.log('Attempting to send SMS for order:', savedOrder);
+        await this.smsService.sendOrderConfirmationSms(savedOrder);
+        console.log('SMS sent successfully');
+      } catch (smsError) {
+        console.error('SMS gönderme hatası:', smsError);
+        // SMS hatası sipariş oluşturmayı etkilemesi
+      }
+
       return savedOrder;
     } catch (error) {
       console.error('Error saving order:', error);
@@ -128,6 +143,39 @@ export class OrderService {
 
   async update(id: string, orderData: Partial<Order>): Promise<Order> {
     const order = await this.findOne(id);
+    
+    // If payment status is being updated, send email
+    if (orderData.paymentStatus && orderData.paymentStatus !== order.paymentStatus) {
+      try {
+        await this.emailService.sendPaymentStatusEmail(
+          order.customerEmail,
+          order.id,
+          order.pnrNo,
+          orderData.paymentStatus,
+          order.price,
+        );
+      } catch (error) {
+        console.error('Email gönderimi sırasında hata:', error);
+        // Continue with the update even if email fails
+      }
+    }
+
+    // If order status is being updated, send email
+    if (orderData.status && orderData.status !== order.status) {
+      try {
+        await this.emailService.sendOrderStatusEmail(
+          order.customerEmail,
+          order.id,
+          order.pnrNo,
+          orderData.status,
+          order.serviceType,
+        );
+      } catch (error) {
+        console.error('Email gönderimi sırasında hata:', error);
+        // Continue with the update even if email fails
+      }
+    }
+
     await this.orderRepository.update(id, orderData);
     return this.findOne(id);
   }
