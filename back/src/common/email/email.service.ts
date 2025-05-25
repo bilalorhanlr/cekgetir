@@ -14,7 +14,6 @@ export class EmailService {
 
   private initializeTransporter() {
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
@@ -28,6 +27,11 @@ export class EmailService {
       socketTimeout: 30000,
       debug: process.env.NODE_ENV === 'development',
       logger: process.env.NODE_ENV === 'development',
+      // TLS ayarları
+      tls: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2',
+      },
     });
 
     // Verify connection configuration
@@ -52,8 +56,26 @@ export class EmailService {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         this.logger.debug(`Attempt ${attempt}/${this.maxRetries} to send email`);
-        const info = await this.transporter.sendMail(mailOptions);
-        this.logger.log(`Email sent successfully on attempt ${attempt}: ${info.messageId}`);
+        
+        // E-posta başlıklarına özel alanlar ekle
+        const enhancedMailOptions = {
+          ...mailOptions,
+          headers: {
+            ...mailOptions.headers,
+            'X-Priority': '1',
+            'X-MSMail-Priority': 'High',
+            'X-Mailer': 'Çekgetir Mail System',
+            'List-Unsubscribe': `<mailto:${process.env.SMTP_FROM}?subject=unsubscribe>`,
+            'Precedence': 'bulk',
+            'X-Auto-Response-Suppress': 'OOF, AutoReply',
+          },
+          // E-posta içeriğini optimize et
+          text: mailOptions.text || this.convertHtmlToText(mailOptions.html as string),
+          priority: 'high' as const,
+        };
+
+        const info = await this.transporter.sendMail(enhancedMailOptions);
+        this.logger.log(`Email sent successfully on attempt ${attempt}`);
         return info;
       } catch (error) {
         lastError = error;
@@ -75,42 +97,73 @@ export class EmailService {
     throw lastError;
   }
 
+  // HTML içeriğini düz metne çevir
+  private convertHtmlToText(html: string): string {
+    return html
+      .replace(/<[^>]*>/g, '') // HTML etiketlerini kaldır
+      .replace(/&nbsp;/g, ' ') // HTML boşlukları düzelt
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+  }
+
   async sendPaymentStatusEmail(
     to: string,
     orderId: string,
     pnrNo: string,
-    status: 'ODENDI' | 'ODENECEK' | 'IADE_EDILDI',
+    status: 'ODEME_BEKLIYOR' | 'ODENDI' | 'IPTAL_EDILDI' | 'IADE_EDILDI',
     amount: number,
   ) {
     const statusText = {
+      ODEME_BEKLIYOR: 'Ödeme Bekleniyor',
       ODENDI: 'Ödendi',
-      ODENECEK: 'Ödeme Bekleniyor',
+      IPTAL_EDILDI: 'İptal Edildi',
       IADE_EDILDI: 'İade Edildi',
     }[status];
 
     const subject = `Sipariş Ödeme Durumu Güncellendi - ${pnrNo}`;
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Sipariş Ödeme Durumu Güncellendi</h2>
-        <p>Sayın Müşterimiz,</p>
-        <p>${pnrNo} numaralı siparişinizin ödeme durumu güncellenmiştir.</p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Sipariş Numarası:</strong> ${pnrNo}</p>
-          <p><strong>Yeni Durum:</strong> ${statusText}</p>
-          <p><strong>Tutar:</strong> ${amount.toLocaleString('tr-TR')} TL</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sipariş Ödeme Durumu</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h2 style="color: #333; margin-bottom: 20px;">Sipariş Ödeme Durumu Güncellendi</h2>
+          <p>Sayın Müşterimiz,</p>
+          <p>${pnrNo} numaralı siparişinizin ödeme durumu güncellenmiştir.</p>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e9ecef;">
+            <p style="margin: 10px 0;"><strong>Sipariş Numarası:</strong> ${pnrNo}</p>
+            <p style="margin: 10px 0;"><strong>Yeni Durum:</strong> ${statusText}</p>
+            <p style="margin: 10px 0;"><strong>Tutar:</strong> ${amount.toLocaleString('tr-TR')} TL</p>
+          </div>
+          <p>Bizi tercih ettiğiniz için teşekkür ederiz.</p>
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+            <p style="color: #666; font-size: 14px;">Saygılarımızla,<br>Çekgetir Ekibi</p>
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+              Bu e-posta ${process.env.SMTP_FROM} adresinden gönderilmiştir.<br>
+              E-posta almak istemiyorsanız <a href="mailto:${process.env.SMTP_FROM}?subject=unsubscribe" style="color: #666;">buraya tıklayın</a>.
+            </p>
+          </div>
         </div>
-        <p>Bizi tercih ettiğiniz için teşekkür ederiz.</p>
-        <p>Saygılarımızla,<br>Çekgetir Ekibi</p>
-      </div>
+      </body>
+      </html>
     `;
 
     try {
       this.logger.debug(`Attempting to send payment status email to ${to}`);
       const info = await this.sendWithRetry({
-        from: process.env.SMTP_FROM,
+        from: `"Çekgetir" <${process.env.SMTP_FROM}>`,
         to,
         subject,
         html,
+        replyTo: process.env.SMTP_REPLY_TO,
       });
       return info;
     } catch (error) {
@@ -123,15 +176,16 @@ export class EmailService {
     to: string,
     orderId: string,
     pnrNo: string,
-    status: 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED',
+    status: 'ONAY_BEKLIYOR' | 'ONAYLANDI' | 'CEKICI_YONLENDIRILIYOR' | 'TRANSFER_SURECINDE' | 'TAMAMLANDI' | 'IPTAL_EDILDI',
     serviceType: string,
   ) {
     const statusText = {
-      PENDING: 'Beklemede',
-      ACCEPTED: 'Onaylandı',
-      IN_PROGRESS: 'İşlemde',
-      COMPLETED: 'Tamamlandı',
-      CANCELLED: 'İptal Edildi',
+      ONAY_BEKLIYOR: 'Onay Bekleniyor',
+      ONAYLANDI: 'Onaylandı',
+      CEKICI_YONLENDIRILIYOR: 'Çekici Yönlendiriliyor',
+      TRANSFER_SURECINDE: 'Transfer Sürecinde',
+      TAMAMLANDI: 'Tamamlandı',
+      IPTAL_EDILDI: 'İptal Edildi',
     }[status];
 
     const serviceTypeText = {
@@ -142,27 +196,44 @@ export class EmailService {
 
     const subject = `Sipariş Durumu Güncellendi - ${pnrNo}`;
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Sipariş Durumu Güncellendi</h2>
-        <p>Sayın Müşterimiz,</p>
-        <p>${pnrNo} numaralı siparişinizin durumu güncellenmiştir.</p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Sipariş Numarası:</strong> ${pnrNo}</p>
-          <p><strong>Hizmet Türü:</strong> ${serviceTypeText}</p>
-          <p><strong>Yeni Durum:</strong> ${statusText}</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sipariş Durumu</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h2 style="color: #333; margin-bottom: 20px;">Sipariş Durumu Güncellendi</h2>
+          <p>Sayın Müşterimiz,</p>
+          <p>${pnrNo} numaralı siparişinizin durumu güncellenmiştir.</p>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e9ecef;">
+            <p style="margin: 10px 0;"><strong>Sipariş Numarası:</strong> ${pnrNo}</p>
+            <p style="margin: 10px 0;"><strong>Hizmet Türü:</strong> ${serviceTypeText}</p>
+            <p style="margin: 10px 0;"><strong>Yeni Durum:</strong> ${statusText}</p>
+          </div>
+          <p>Bizi tercih ettiğiniz için teşekkür ederiz.</p>
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+            <p style="color: #666; font-size: 14px;">Saygılarımızla,<br>Çekgetir Ekibi</p>
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+              Bu e-posta ${process.env.SMTP_FROM} adresinden gönderilmiştir.<br>
+              E-posta almak istemiyorsanız <a href="mailto:${process.env.SMTP_FROM}?subject=unsubscribe" style="color: #666;">buraya tıklayın</a>.
+            </p>
+          </div>
         </div>
-        <p>Bizi tercih ettiğiniz için teşekkür ederiz.</p>
-        <p>Saygılarımızla,<br>Çekgetir Ekibi</p>
-      </div>
+      </body>
+      </html>
     `;
 
     try {
       this.logger.debug(`Attempting to send order status email to ${to}`);
       const info = await this.sendWithRetry({
-        from: process.env.SMTP_FROM,
+        from: `"Çekgetir" <${process.env.SMTP_FROM}>`,
         to,
         subject,
         html,
+        replyTo: process.env.SMTP_REPLY_TO,
       });
       return info;
     } catch (error) {

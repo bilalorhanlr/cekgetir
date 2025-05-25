@@ -62,8 +62,8 @@ export class OrderService {
       vehicleYear: orderData.vehicles?.[0]?.yil || '',
       vehiclePlate: orderData.vehicles?.[0]?.plaka || '',
       price: orderData.price || 0,
-      status: 'PENDING',
-      paymentStatus: 'ODENECEK',
+      status: 'ONAY_BEKLIYOR',
+      paymentStatus: 'ODEME_BEKLIYOR',
       faultType: orderData.faultType || ''
     });
 

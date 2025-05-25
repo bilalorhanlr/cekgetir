@@ -102,11 +102,11 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ type: 'enum', enum: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], default: 'PENDING' })
-  status: 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  @Column({ type: 'enum', enum: ['ONAY_BEKLIYOR', 'ONAYLANDI', 'CEKICI_YONLENDIRILIYOR', 'TRANSFER_SURECINDE', 'TAMAMLANDI', 'IPTAL_EDILDI'], default: 'ONAY_BEKLIYOR' })
+  status: 'ONAY_BEKLIYOR' | 'ONAYLANDI' | 'CEKICI_YONLENDIRILIYOR' | 'TRANSFER_SURECINDE' | 'TAMAMLANDI' | 'IPTAL_EDILDI';
 
-  @Column({ type: 'enum', enum: ['ODENDI', 'ODENECEK', 'IADE_EDILDI'], default: 'ODENECEK' })
-  paymentStatus: 'ODENDI' | 'ODENECEK' | 'IADE_EDILDI';
+  @Column({ type: 'enum', enum: ['ODEME_BEKLIYOR', 'ODENDI', 'IPTAL_EDILDI', 'IADE_EDILDI'], default: 'ODEME_BEKLIYOR' })
+  paymentStatus: 'ODEME_BEKLIYOR' | 'ODENDI' | 'IPTAL_EDILDI' | 'IADE_EDILDI';
 
   @Column({ nullable: true })
   assignedDriverId: string;

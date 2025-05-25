@@ -63,14 +63,15 @@ export default function OrderDetailPage({ params }) {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'PENDING': { text: 'Beklemede', color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50' },
-      'ACCEPTED': { text: 'Onaylandı', color: 'bg-blue-500/20 text-blue-500 border-blue-500/50' },
-      'IN_PROGRESS': { text: 'İşlemde', color: 'bg-purple-500/20 text-purple-500 border-purple-500/50' },
-      'COMPLETED': { text: 'Tamamlandı', color: 'bg-green-500/20 text-green-500 border-green-500/50' },
-      'CANCELLED': { text: 'İptal Edildi', color: 'bg-red-500/20 text-red-500 border-red-500/50' }
+      'ONAY_BEKLIYOR': { text: 'Onay Bekleniyor', color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50' },
+      'ONAYLANDI': { text: 'Onaylandı', color: 'bg-blue-500/20 text-blue-500 border-blue-500/50' },
+      'CEKICI_YONLENDIRILIYOR': { text: 'Çekici Yönlendiriliyor', color: 'bg-purple-500/20 text-purple-500 border-purple-500/50' },
+      'TRANSFER_SURECINDE': { text: 'Transfer Sürecinde', color: 'bg-indigo-500/20 text-indigo-500 border-indigo-500/50' },
+      'TAMAMLANDI': { text: 'Tamamlandı', color: 'bg-green-500/20 text-green-500 border-green-500/50' },
+      'IPTAL_EDILDI': { text: 'İptal Edildi', color: 'bg-red-500/20 text-red-500 border-red-500/50' }
     }
 
-    const config = statusConfig[status] || statusConfig['PENDING']
+    const config = statusConfig[status] || statusConfig['ONAY_BEKLIYOR']
     return (
       <span className={`px-3 py-1.5 rounded-full text-sm font-medium border ${config.color}`}>
         {config.text}
@@ -80,12 +81,13 @@ export default function OrderDetailPage({ params }) {
 
   const getPaymentStatusBadge = (status) => {
     const statusConfig = {
+      'ODEME_BEKLIYOR': { text: 'Ödeme Bekleniyor', color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50' },
       'ODENDI': { text: 'Ödendi', color: 'bg-green-500/20 text-green-500 border-green-500/50' },
-      'ODENECEK': { text: 'Ödenecek', color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50' },
-      'IADE_EDILDI': { text: 'İade Edildi', color: 'bg-red-500/20 text-red-500 border-red-500/50' }
+      'IPTAL_EDILDI': { text: 'İptal Edildi', color: 'bg-red-500/20 text-red-500 border-red-500/50' },
+      'IADE_EDILDI': { text: 'İade Edildi', color: 'bg-orange-500/20 text-orange-500 border-orange-500/50' }
     }
 
-    const config = statusConfig[status] || statusConfig['ODENECEK']
+    const config = statusConfig[status] || statusConfig['ODEME_BEKLIYOR']
     return (
       <span className={`px-3 py-1.5 rounded-full text-sm font-medium border ${config.color}`}>
         {config.text}
@@ -277,75 +279,90 @@ export default function OrderDetailPage({ params }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => updateOrderStatus('PENDING')}
-                        disabled={updatingStatus || order.status === 'PENDING'}
+                        onClick={() => updateOrderStatus('ONAY_BEKLIYOR')}
+                        disabled={updatingStatus || order.status === 'ONAY_BEKLIYOR'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.status === 'PENDING'
+                          order.status === 'ONAY_BEKLIYOR'
                             ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingStatus && order.status === 'PENDING' ? (
+                        {updatingStatus && order.status === 'ONAY_BEKLIYOR' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
-                        ) : 'Beklemede'}
+                        ) : 'Onay Bekleniyor'}
                       </button>
                       <button
-                        onClick={() => updateOrderStatus('ACCEPTED')}
-                        disabled={updatingStatus || order.status === 'ACCEPTED'}
+                        onClick={() => updateOrderStatus('ONAYLANDI')}
+                        disabled={updatingStatus || order.status === 'ONAYLANDI'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.status === 'ACCEPTED'
+                          order.status === 'ONAYLANDI'
                             ? 'bg-blue-500 text-black shadow-lg shadow-blue-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingStatus && order.status === 'ACCEPTED' ? (
+                        {updatingStatus && order.status === 'ONAYLANDI' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
                         ) : 'Onaylandı'}
                       </button>
                       <button
-                        onClick={() => updateOrderStatus('IN_PROGRESS')}
-                        disabled={updatingStatus || order.status === 'IN_PROGRESS'}
+                        onClick={() => updateOrderStatus('CEKICI_YONLENDIRILIYOR')}
+                        disabled={updatingStatus || order.status === 'CEKICI_YONLENDIRILIYOR'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.status === 'IN_PROGRESS'
+                          order.status === 'CEKICI_YONLENDIRILIYOR'
                             ? 'bg-purple-500 text-black shadow-lg shadow-purple-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingStatus && order.status === 'IN_PROGRESS' ? (
+                        {updatingStatus && order.status === 'CEKICI_YONLENDIRILIYOR' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
-                        ) : 'İşlemde'}
+                        ) : 'Çekici Yönlendiriliyor'}
                       </button>
                       <button
-                        onClick={() => updateOrderStatus('COMPLETED')}
-                        disabled={updatingStatus || order.status === 'COMPLETED'}
+                        onClick={() => updateOrderStatus('TRANSFER_SURECINDE')}
+                        disabled={updatingStatus || order.status === 'TRANSFER_SURECINDE'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.status === 'COMPLETED'
+                          order.status === 'TRANSFER_SURECINDE'
+                            ? 'bg-indigo-500 text-black shadow-lg shadow-indigo-500/20'
+                            : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
+                        }`}
+                      >
+                        {updatingStatus && order.status === 'TRANSFER_SURECINDE' ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        ) : 'Transfer Sürecinde'}
+                      </button>
+                      <button
+                        onClick={() => updateOrderStatus('TAMAMLANDI')}
+                        disabled={updatingStatus || order.status === 'TAMAMLANDI'}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
+                          order.status === 'TAMAMLANDI'
                             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingStatus && order.status === 'COMPLETED' ? (
+                        {updatingStatus && order.status === 'TAMAMLANDI' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
                         ) : 'Tamamlandı'}
                       </button>
                       <button
-                        onClick={() => updateOrderStatus('CANCELLED')}
-                        disabled={updatingStatus || order.status === 'CANCELLED'}
+                        onClick={() => updateOrderStatus('IPTAL_EDILDI')}
+                        disabled={updatingStatus || order.status === 'IPTAL_EDILDI'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.status === 'CANCELLED'
+                          order.status === 'IPTAL_EDILDI'
                             ? 'bg-red-500 text-black shadow-lg shadow-red-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingStatus && order.status === 'CANCELLED' ? (
+                        {updatingStatus && order.status === 'IPTAL_EDILDI' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
@@ -358,21 +375,21 @@ export default function OrderDetailPage({ params }) {
                     <div className="flex items-center gap-2 mb-3">
                       {getPaymentStatusBadge(order.paymentStatus)}
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => updatePaymentStatus('ODENECEK')}
-                        disabled={updatingPaymentStatus || order.paymentStatus === 'ODENECEK'}
+                        onClick={() => updatePaymentStatus('ODEME_BEKLIYOR')}
+                        disabled={updatingPaymentStatus || order.paymentStatus === 'ODEME_BEKLIYOR'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
-                          order.paymentStatus === 'ODENECEK'
+                          order.paymentStatus === 'ODEME_BEKLIYOR'
                             ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
-                        {updatingPaymentStatus && order.paymentStatus === 'ODENECEK' ? (
+                        {updatingPaymentStatus && order.paymentStatus === 'ODEME_BEKLIYOR' ? (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
-                        ) : 'Ödenecek'}
+                        ) : 'Ödeme Bekleniyor'}
                       </button>
                       <button
                         onClick={() => updatePaymentStatus('ODENDI')}
@@ -390,11 +407,26 @@ export default function OrderDetailPage({ params }) {
                         ) : 'Ödendi'}
                       </button>
                       <button
+                        onClick={() => updatePaymentStatus('IPTAL_EDILDI')}
+                        disabled={updatingPaymentStatus || order.paymentStatus === 'IPTAL_EDILDI'}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
+                          order.paymentStatus === 'IPTAL_EDILDI'
+                            ? 'bg-red-500 text-black shadow-lg shadow-red-500/20'
+                            : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
+                        }`}
+                      >
+                        {updatingPaymentStatus && order.paymentStatus === 'IPTAL_EDILDI' ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        ) : 'İptal Edildi'}
+                      </button>
+                      <button
                         onClick={() => updatePaymentStatus('IADE_EDILDI')}
                         disabled={updatingPaymentStatus || order.paymentStatus === 'IADE_EDILDI'}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all relative ${
                           order.paymentStatus === 'IADE_EDILDI'
-                            ? 'bg-red-500 text-black shadow-lg shadow-red-500/20'
+                            ? 'bg-orange-500 text-black shadow-lg shadow-orange-500/20'
                             : 'bg-[#141414] text-white hover:bg-[#2a2a2a]'
                         }`}
                       >
@@ -402,7 +434,7 @@ export default function OrderDetailPage({ params }) {
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                           </div>
-                        ) : 'İade'}
+                        ) : 'İade Edildi'}
                       </button>
                     </div>
                   </div>
