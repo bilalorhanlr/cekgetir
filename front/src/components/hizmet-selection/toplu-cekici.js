@@ -564,448 +564,132 @@ export default function TopluCekiciModal({ onClose }) {
     }
   }, [selectedDeliveryCity, deliveryOtopark]);
 
+  // Remove duplicate useEffect hooks and consolidate them
   useEffect(() => {
-    if (pickupOtopark && selectedPickupCity && fiyatlandirma?.sehirler) {
-      const sehir = fiyatlandirma.sehirler.find(s => s.id === selectedPickupCity)
-      if (sehir) {
-        setPickupSearchValue(sehir.adres)
-        setPickupLocation({
-          lat: sehir.lat,
-          lng: sehir.lng,
-          address: sehir.adres
-        })
-      }
-    }
-  }, [pickupOtopark, selectedPickupCity, fiyatlandirma])
+    const handleLocationUpdate = (isPickup) => {
+      const city = isPickup ? selectedPickupCity : selectedDeliveryCity;
+      const isOtopark = isPickup ? pickupOtopark : deliveryOtopark;
+      const setLocation = isPickup ? setPickupLocation : setDeliveryLocation;
+      const setSearchValue = isPickup ? setPickupSearchValue : setDeliverySearchValue;
 
-  useEffect(() => {
-    if (deliveryOtopark && selectedDeliveryCity && fiyatlandirma?.sehirler) {
-      const sehir = fiyatlandirma.sehirler.find(s => s.id === selectedDeliveryCity)
-      if (sehir) {
-        setDeliverySearchValue(sehir.adres)
-        setDeliveryLocation({
-          lat: sehir.lat,
-          lng: sehir.lng,
-          address: sehir.adres
-        })
-      }
-    }
-  }, [deliveryOtopark, selectedDeliveryCity, fiyatlandirma])
-
-  // Sipariş oluşturma fonksiyonu
-  const createOrder = async () => {
-    try {
-      // Müşteri bilgilerini hazırla
-      const customerInfo = {
-        ad: musteriBilgileri.ad,
-        soyad: musteriBilgileri.soyad,
-        telefon: musteriBilgileri.telefon,
-        email: musteriBilgileri.email,
-        tcKimlik: musteriBilgileri.tcKimlik || '11111111',
-        firmaAdi: musteriBilgileri.firmaAdi,
-        vergiNo: musteriBilgileri.vergiNo,
-        vergiDairesi: musteriBilgileri.vergiDairesi
-      };
-
-      // Araç bilgilerini hazırla - Backend'in beklediği formatta
-      const vehicles = araclar.map(arac => ({
-        tip: arac.segment,
-        marka: arac.marka,
-        model: arac.model,
-        yil: arac.yil,
-        plaka: arac.plaka,
-        condition: arac.durum
-      }));
-
-      // Sipariş verilerini hazırla
-      const orderData = {
-        serviceType: 'TOPLU_CEKICI',
-        customerInfo,
-        vehicles,
-        price: toplamFiyat,
-        pickupLocation: pickupLocation.address,
-        dropoffLocation: deliveryLocation.address,
-        isPickupFromParking: pickupOtopark,
-        isDeliveryToParking: deliveryOtopark,
-        specialNotes: '',
-        numberOfVehicles: araclar.length
-      };
-
-      console.log('Gönderilen sipariş verisi:', orderData); // Debug için
-
-      // API'ye gönder
-      const { data } = await api.post('/api/orders', orderData);
-
-      if (!data || !data.pnr) {
-        throw new Error('Talep oluşturulamadı');
-      }
-
-      setPnrNumber(data.pnr);
-      setStep(5);
-
-      // PNR'ı localStorage'a kaydet
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('lastPnr', data.pnr);
-        
-        // Sipariş bilgilerini kaydet
-        const orderInfo = {
-          pnr: data.pnr,
-          pickupCity: selectedPickupCity,
-          deliveryCity: selectedDeliveryCity,
-          vehicles,
-          price: toplamFiyat,
-          customerInfo,
-          timestamp: new Date().toISOString()
-        };
-        localStorage.setItem(`order_${data.pnr}`, JSON.stringify(orderInfo));
-      }
-
-      toast.success('Sipariş başarıyla oluşturuldu!');
-    } catch (error) {
-      console.error('Sipariş oluşturma hatası:', error);
-      toast.error('Sipariş oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (step === 1) {
-      if (!pickupLocation || !deliveryLocation || (pickupOtopark && !selectedPickupCity) || (deliveryOtopark && !selectedDeliveryCity)) {
-        alert('Lütfen konumları seçin');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment)) {
-        alert('Lütfen en az bir araç seçin');
-        return;
-      }
-      setStep(3);
-    } else if (step === 3) {
-      if (!toplamFiyat) {
-        alert('Lütfen fiyat hesaplamasını bekleyin');
-        return;
-      }
-      setStep(4);
-    } else if (step === 4) {
-      if (musteriBilgileri.musteriTipi === 'kisisel') {
-        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
-          return;
-        }
-        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          alert('Lütfen TC Kimlik numaranızı girin');
-          return;
-        }
-      } else {
-        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
-          return;
-        }
-      }
-      await createOrder();
-    }
-  };
-
-  useEffect(() => {
-    if (pickupOtopark && selectedPickupCity && fiyatlandirma?.sehirler) {
-      const sehir = fiyatlandirma.sehirler.find(s => s.id === selectedPickupCity)
-      if (sehir) {
-        setPickupSearchValue(sehir.adres)
-        setPickupLocation({
-          lat: sehir.lat,
-          lng: sehir.lng,
-          address: sehir.adres
-        })
-      }
-    }
-  }, [pickupOtopark, selectedPickupCity, fiyatlandirma])
-
-  useEffect(() => {
-    if (deliveryOtopark && selectedDeliveryCity && fiyatlandirma?.sehirler) {
-      const sehir = fiyatlandirma.sehirler.find(s => s.id === selectedDeliveryCity)
-      if (sehir) {
-        setDeliverySearchValue(sehir.adres)
-        setDeliveryLocation({
-          lat: sehir.lat,
-          lng: sehir.lng,
-          address: sehir.adres
-        })
-      }
-    }
-  }, [deliveryOtopark, selectedDeliveryCity, fiyatlandirma])
-
-  useEffect(() => {
-    const calculatePrice = () => {
-      if (!pickupLocation || !deliveryLocation || !routeInfo || !sehirFiyatlandirma) {
-        return;
-      }
-
-      const basePrice = Number(sehirFiyatlandirma.basePrice) || 0;
-      const distanceInKm = routeInfo.distanceValue / 1000 ;
-      const kmPrice = distanceInKm * (Number(sehirFiyatlandirma.basePricePerKm));
-      const totalPrice = basePrice + kmPrice;
-
-      // Sadece toplamFiyat'ı güncelle
-      setToplamFiyat(totalPrice);
-    };
-
-    calculatePrice();
-  }, [pickupLocation, deliveryLocation, routeInfo?.distance, sehirFiyatlandirma?.basePrice, sehirFiyatlandirma?.basePricePerKm]);
-
-  const FiyatDetaylari = ({ routeInfo, toplamFiyat }) => {
-    if (!routeInfo || !toplamFiyat || !sehirFiyatlandirma) {
-      return null;
-    }
-
-    const basePrice = Number(sehirFiyatlandirma.basePrice) || 0;
-    const distanceInKm = routeInfo.distanceValue ? routeInfo.distanceValue / 1000 : 0;
-    const kmPrice = distanceInKm * (Number(sehirFiyatlandirma.basePricePerKm) || 0);
-    const aracBasiFiyat = basePrice + kmPrice;
-
-    const formatPrice = (price) => {
-      if (typeof price !== 'number' || isNaN(price)) return '0';
-      return price.toLocaleString('tr-TR');
-    };
-
-    // Her araç için detaylı fiyat hesaplama
-    const aracFiyatlari = araclar.map(arac => {
-      const segment = vehicleData.segmentler.find(s => s.id === parseInt(arac.segment));
-      const durum = vehicleData.durumlar.find(d => d.id === parseInt(arac.durum));
-      
-      const segmentMultiplier = segment ? parseFloat(segment.price) : 1;
-      const durumFiyati = durum ? parseFloat(durum.price) : 0;
-      
-      const segmentFiyati = Math.round(aracBasiFiyat * segmentMultiplier);
-      const toplamFiyat = Math.round(segmentFiyati + durumFiyati);
-      
-      return {
-        ...arac,
-        segmentAdi: segment?.name || 'Bilinmeyen',
-        durumAdi: durum?.name || 'Bilinmeyen',
-        temelFiyat: aracBasiFiyat,
-        segmentMultiplier,
-        segmentFiyati,
-        durumFiyati,
-        toplamFiyat
-      };
-    });
-
-    return (
-      <div className="bg-[#1a1a1a] rounded-xl p-6 shadow-lg border border-[#2a2a2a] mt-4">
-        <h3 className="text-lg font-semibold text-white mb-4">Fiyat Detayları</h3>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400">Toplam Araç Sayısı</span>
-            <span className="text-white font-medium">{araclar.length} Araç</span>
-          </div>
-          {aracFiyatlari.map((arac, index) => (
-            <div key={arac.id} className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">{index + 1}. Araç Ücreti</span>
-                <span className="text-white font-medium">{formatPrice(arac.toplamFiyat)} TL</span>
-              </div>
-            </div>
-          ))}
-          <div className="border-t border-[#2a2a2a] my-3"></div>
-          <div className="flex justify-between items-center">
-            <span className="text-yellow-500 font-semibold">Toplam</span>
-            <span className="text-yellow-500 font-semibold text-xl">{formatPrice(toplamFiyat)} TL</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (loadError) {
-    console.error('Google Maps yüklenirken hata oluştu:', loadError)
-    return null
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141414]/90 backdrop-blur-sm">
-        <div className="relative bg-[#202020] rounded-2xl shadow-2xl max-w-2xl w-full p-6">
-          <div className="text-white text-center">Yükleniyor...</div>
-        </div>
-      </div>
-    )
-  }
-
-  const getAddressFromLatLng = async (lat, lng) => {
-    if (!window.google) return ''
-    const geocoder = new window.google.maps.Geocoder()
-    return new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          resolve(results[0].formatted_address)
-        } else {
-          resolve('')
-        }
-      })
-    })
-  }
-
-  const handlePlaceChanged = async (e) => {
-    const place = e.detail.place
-    if (place && place.geometry) {
-      const newLocation = {
-        lat: place.geometry.location.lat,
-        lng: place.geometry.location.lng,
-        address: place.formatted_address
-      }
-
-      // Şehir bilgisini bul
-      let sehir = '';
-      for (const component of place.address_components) {
-        if (component.types.includes('administrative_area_level_1')) {
-          sehir = component.long_name;
-          break;
-        }
-      }
-
-      // Şehir fiyatlandırmasını getir
-      if (sehir) {
-        try {
-          const normalizedSehir = normalizeSehirAdi(sehir);
-          const response = await api.get(`/api/variables/toplu-cekici/sehirler/${normalizedSehir}`);
-          setSehirFiyatlandirma(response.data);
-        } catch (error) {
-          setSehirFiyatlandirma(null);
-        }
-      }
-
-      if (activeLocation === 'pickup') {
-        setPickupLocation(newLocation)
-        setPickupSearchValue(place.formatted_address)
-      } else {
-        setDeliveryLocation(newLocation)
-        setDeliverySearchValue(place.formatted_address)
-      }
-      setActiveMapPanel(null)
-    }
-  }
-
-  const handleMapClick = async (e) => {
-    const lat = e.latLng.lat()
-    const lng = e.latLng.lng()
-    const address = await getAddressFromLatLng(lat, lng)
-    const newLocation = { lat, lng, address }
-
-    // Google Maps Geocoder ile şehir bilgisini al
-    const geocoder = new window.google.maps.Geocoder()
-    geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
-      if (status === 'OK' && results[0]) {
-        let sehir = '';
-        for (const component of results[0].address_components) {
-          if (component.types.includes('administrative_area_level_1')) {
-            sehir = component.long_name;
-            break;
-          }
-        }
-
-        // Şehir fiyatlandırmasını getir
+      if (isOtopark && city && fiyatlandirma?.sehirler) {
+        const sehir = fiyatlandirma.sehirler.find(s => s.id === city);
         if (sehir) {
-          try {
-            const normalizedSehir = normalizeSehirAdi(sehir);
-            const response = await api.get(`/api/variables/toplu-cekici/sehirler/${normalizedSehir}`);
-            setSehirFiyatlandirma(response.data);
-          } catch (error) {
-            setSehirFiyatlandirma(null);
-          }
+          setSearchValue(sehir.adres);
+          setLocation({
+            lat: sehir.lat,
+            lng: sehir.lng,
+            address: sehir.adres
+          });
         }
       }
-    });
+    };
 
-    // Şehir tespiti yap
-    const detectedCity = await sehirTespiti(newLocation)
-    console.log('📍 Tespit edilen şehir:', detectedCity)
+    handleLocationUpdate(true); // Handle pickup location
+    handleLocationUpdate(false); // Handle delivery location
+  }, [pickupOtopark, deliveryOtopark, selectedPickupCity, selectedDeliveryCity, fiyatlandirma]);
 
-    if (activeLocation === 'pickup') {
-      setLocationWithValidation(setPickupLocation, newLocation)
-      setPickupSearchValue(address)
-      if (detectedCity) {
-        setSelectedPickupCity(detectedCity)
-      }
-    } else {
-      setLocationWithValidation(setDeliveryLocation, newLocation)
-      setDeliverySearchValue(address)
-      if (detectedCity) {
-        setSelectedDeliveryCity(detectedCity)
-      }
-    }
-    setActiveMapPanel(null)
-  }
-
+  // Improve geolocation error handling
   const handleCurrentLocation = async (target) => {
     if (!navigator.geolocation) {
       toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
       return;
     }
 
-    // Önce izinleri kontrol et
-    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      
       if (permissionStatus.state === 'denied') {
         toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
         return;
       }
 
-      // Konum alma işlemini başlat
-      toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      const loadingToast = toast.loading('Konumunuz alınıyor...', { id: 'location' });
       
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          const address = await getAddressFromLatLng(latitude, longitude);
-          const newLocation = { lat: latitude, lng: longitude, address };
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      };
 
-          // Şehir tespiti yap
-          const detectedCity = await sehirTespiti(newLocation);
-          console.log('📍 Tespit edilen şehir:', detectedCity);
+      const getPosition = (highAccuracy = true) => {
+        return new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            {
+              ...options,
+              enableHighAccuracy: highAccuracy,
+              timeout: highAccuracy ? 15000 : 60000
+            }
+          );
+        });
+      };
 
-          if (target === 'pickup') {
-            setLocationWithValidation(setPickupLocation, newLocation);
-            setPickupSearchValue(address);
-            if (detectedCity) {
-              setSelectedPickupCity(detectedCity);
-            }
-          } else {
-            setLocationWithValidation(setDeliveryLocation, newLocation);
-            setDeliverySearchValue(address);
-            if (detectedCity) {
-              setSelectedDeliveryCity(detectedCity);
-            }
-          }
-          setActiveMapPanel(null);
-          
-          toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          let errorMessage = 'Konum alınamadı.';
-          
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun.';
-              break;
-            case error.TIMEOUT:
-              errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
-              break;
-          }
-          
-          toast.error(errorMessage, { id: 'location' });
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
+      try {
+        const position = await getPosition(true);
+        const { latitude, longitude } = position.coords;
+        const address = await getAddressFromLatLng(latitude, longitude);
+        const newLocation = { lat: latitude, lng: longitude, address };
+        
+        if (target === 'pickup') {
+          setPickupLocation(newLocation);
+          setPickupSearchValue(address);
+        } else {
+          setDeliveryLocation(newLocation);
+          setDeliverySearchValue(address);
         }
-      );
-    });
+        setActiveMapPanel(null);
+        
+        toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+      } catch (error) {
+        console.error('High accuracy geolocation error:', error);
+        
+        if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
+          try {
+            const lowAccuracyPosition = await getPosition(false);
+            const { latitude, longitude } = lowAccuracyPosition.coords;
+            const address = await getAddressFromLatLng(latitude, longitude);
+            const newLocation = { lat: latitude, lng: longitude, address };
+
+            if (target === 'pickup') {
+              setPickupLocation(newLocation);
+              setPickupSearchValue(address);
+            } else {
+              setDeliveryLocation(newLocation);
+              setDeliverySearchValue(address);
+            }
+            setActiveMapPanel(null);
+            
+            toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+            return;
+          } catch (retryError) {
+            console.error('Low accuracy geolocation error:', retryError);
+          }
+        }
+
+        let errorMessage = 'Konum alınamadı.';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
+            break;
+          default:
+            errorMessage = 'Konum alınamadı. Lütfen manuel olarak girin.';
+        }
+        
+        toast.error(errorMessage, { id: 'location' });
+      }
+    } catch (error) {
+      console.error('Permission check error:', error);
+      toast.error('Konum izni kontrol edilemedi. Lütfen manuel olarak girin.');
+    }
   };
 
   const handleClose = () => {
@@ -1065,6 +749,283 @@ export default function TopluCekiciModal({ onClose }) {
       }
       return arac;
     }));
+  };
+
+  const handleInputChange = async (e) => {
+    const value = e.target.value;
+    if (activeLocation === 'pickup') {
+      setPickupSearchValue(value);
+    } else {
+      setDeliverySearchValue(value);
+    }
+  };
+
+  const handlePredictionSelect = async (prediction) => {
+    if (!window.google) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    try {
+      const result = await geocoder.geocode({ placeId: prediction.place_id });
+      if (result.results[0]) {
+        const location = {
+          lat: result.results[0].geometry.location.lat(),
+          lng: result.results[0].geometry.location.lng(),
+          address: result.results[0].formatted_address
+        };
+
+        if (activeLocation === 'pickup') {
+          setPickupLocation(location);
+          setPickupSearchValue(location.address);
+        } else {
+          setDeliveryLocation(location);
+          setDeliverySearchValue(location.address);
+        }
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      const pickupInput = document.getElementById('pickup-input');
+      const deliveryInput = document.getElementById('delivery-input');
+
+      if (pickupInput) {
+        const pickupAutocomplete = new window.google.maps.places.Autocomplete(pickupInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        pickupAutocomplete.addListener('place_changed', () => {
+          const place = pickupAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setPickupLocation(location);
+            setPickupSearchValue(location.address);
+          }
+        });
+      }
+
+      if (deliveryInput) {
+        const deliveryAutocomplete = new window.google.maps.places.Autocomplete(deliveryInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        deliveryAutocomplete.addListener('place_changed', () => {
+          const place = deliveryAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setDeliveryLocation(location);
+            setDeliverySearchValue(location.address);
+          }
+        });
+      }
+    }
+  }, [isLoaded]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (step === 1) {
+      // Konum kontrolleri
+      if (!pickupLocation) {
+        toast.error('Lütfen alınacak konumu seçin');
+        return;
+      }
+      
+      if (!deliveryLocation) {
+        toast.error('Lütfen teslim edilecek konumu seçin');
+        return;
+      }
+
+      // Araç kontrolleri
+      if (araclar.length === 0) {
+        toast.error('Lütfen en az bir araç ekleyin');
+        return;
+      }
+
+      if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)) {
+        toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
+        return;
+      }
+
+      setStep(2);
+    } else if (step === 2) {
+      if (!toplamFiyat) {
+        toast.error('Lütfen fiyat hesaplamasını bekleyin');
+        return;
+      }
+
+      setStep(3);
+    } else if (step === 3) {
+      // Müşteri bilgileri kontrolleri
+      if (musteriBilgileri.musteriTipi === 'kisisel') {
+        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
+          return;
+        }
+        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+          toast.error('Lütfen TC Kimlik numaranızı girin');
+          return;
+        }
+      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
+        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
+          return;
+        }
+      }
+
+      await createOrder();
+    }
+  };
+
+  const createOrder = async () => {
+    try {
+      // Müşteri bilgilerini hazırla
+      const customerInfo = {
+        ad: musteriBilgileri.ad,
+        soyad: musteriBilgileri.soyad,
+        telefon: musteriBilgileri.telefon,
+        email: musteriBilgileri.email,
+        tcKimlik: musteriBilgileri.tcKimlik || '11111111',
+        firmaAdi: musteriBilgileri.firmaAdi,
+        vergiNo: musteriBilgileri.vergiNo,
+        vergiDairesi: musteriBilgileri.vergiDairesi
+      };
+
+      // Araç bilgilerini hazırla - Backend'in beklediği formatta
+      const vehicles = araclar.map(arac => ({
+        tip: arac.segment,
+        marka: arac.marka,
+        model: arac.model,
+        yil: arac.yil,
+        plaka: arac.plaka,
+        condition: arac.durum
+      }));
+
+      // Sipariş verilerini hazırla
+      const orderData = {
+        serviceType: 'TOPLU_CEKICI',
+        customerInfo,
+        vehicles,
+        price: toplamFiyat,
+        pickupLocation: pickupLocation.address,
+        dropoffLocation: deliveryLocation.address,
+        isPickupFromParking: pickupOtopark,
+        isDeliveryToParking: deliveryOtopark,
+        specialNotes: '',
+        numberOfVehicles: araclar.length
+      };
+
+      console.log('Gönderilen sipariş verisi:', orderData);
+
+      // API'ye gönder
+      const { data } = await api.post('/api/orders', orderData);
+
+      if (!data || !data.pnr) {
+        throw new Error('Talep numarası alınamadı');
+      }
+
+      setPnrNumber(data.pnr);
+      setStep(5);
+
+      // PNR'ı localStorage'a kaydet
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastPnr', data.pnr);
+        
+        // Sipariş bilgilerini kaydet
+        const orderInfo = {
+          pnr: data.pnr,
+          pickupCity: selectedPickupCity,
+          deliveryCity: selectedDeliveryCity,
+          vehicles,
+          price: toplamFiyat,
+          customerInfo,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(`order_${data.pnr}`, JSON.stringify(orderInfo));
+      }
+
+      toast.success('Siparişiniz başarıyla oluşturuldu!');
+    } catch (error) {
+      console.error('Sipariş oluşturma hatası:', error);
+      toast.error('Sipariş oluşturulurken bir hata oluştu: ' + (error?.response?.data?.message || error?.message || 'Bilinmeyen hata'));
+    }
+  };
+
+  const getAddressFromLatLng = async (lat, lng) => {
+    if (!window.google) return '';
+    const geocoder = new window.google.maps.Geocoder();
+    return new Promise((resolve) => {
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          resolve(results[0].formatted_address);
+        } else {
+          resolve('');
+        }
+      });
+    });
+  };
+
+  const handleMapClick = async (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const address = await getAddressFromLatLng(lat, lng);
+    const newLocation = { lat, lng, address };
+
+    // Google Maps Geocoder ile şehir bilgisini al
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
+      if (status === 'OK' && results[0]) {
+        let sehir = '';
+        for (const component of results[0].address_components) {
+          if (component.types.includes('administrative_area_level_1')) {
+            sehir = component.long_name;
+            break;
+          }
+        }
+
+        // Şehir fiyatlandırmasını getir
+        if (sehir) {
+          try {
+            const normalizedSehir = normalizeSehirAdi(sehir);
+            const response = await api.get(`/api/variables/toplu-cekici/sehirler/${normalizedSehir}`);
+            setSehirFiyatlandirma(response.data);
+          } catch (error) {
+            setSehirFiyatlandirma(null);
+          }
+        }
+      }
+    });
+
+    // Şehir tespiti yap
+    const detectedCity = await sehirTespiti(newLocation);
+    console.log('📍 Tespit edilen şehir:', detectedCity);
+
+    if (activeLocation === 'pickup') {
+      setLocationWithValidation(setPickupLocation, newLocation);
+      setPickupSearchValue(address);
+      if (detectedCity) {
+        setSelectedPickupCity(detectedCity);
+      }
+    } else {
+      setLocationWithValidation(setDeliveryLocation, newLocation);
+      setDeliverySearchValue(address);
+      if (detectedCity) {
+        setSelectedDeliveryCity(detectedCity);
+      }
+    }
+    setActiveMapPanel(null);
   };
 
   return (
@@ -1133,9 +1094,10 @@ export default function TopluCekiciModal({ onClose }) {
                     <div className="space-y-4">
                       <div className="relative">
                         <input
+                          id="pickup-input"
                           type="text"
                           value={pickupSearchValue}
-                          onChange={(e) => setPickupSearchValue(e.target.value)}
+                          onChange={handleInputChange}
                           onFocus={() => setActiveLocation('pickup')}
                           placeholder="Adres veya konum ara..."
                           className="w-full py-2.5 px-4 bg-[#202020] text-white rounded-lg border border-[#404040] focus:outline-none focus:border-yellow-500"
@@ -1228,9 +1190,10 @@ export default function TopluCekiciModal({ onClose }) {
                     <div className="space-y-4">
                       <div className="relative">
                         <input
+                          id="delivery-input"
                           type="text"
                           value={deliverySearchValue}
-                          onChange={(e) => setDeliverySearchValue(e.target.value)}
+                          onChange={handleInputChange}
                           onFocus={() => setActiveLocation('delivery')}
                           placeholder="Adres veya konum ara..."
                           className="w-full py-2.5 px-4 bg-[#202020] text-white rounded-lg border border-[#404040] focus:outline-none focus:border-yellow-500"
@@ -1430,7 +1393,7 @@ export default function TopluCekiciModal({ onClose }) {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment)}
+                  disabled={araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)}
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Devam Et

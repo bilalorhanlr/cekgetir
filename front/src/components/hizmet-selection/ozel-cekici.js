@@ -41,9 +41,10 @@ export default function OzelCekiciModal({ onClose }) {
   const [step, setStep] = useState(1)
   const [pickupLocation, setPickupLocation] = useState(null)
   const [deliveryLocation, setDeliveryLocation] = useState(null)
+  const [activeLocation, setActiveLocation] = useState(null)
+  const [activeMapPanel, setActiveMapPanel] = useState(null)
   const [pickupSearchValue, setPickupSearchValue] = useState('')
   const [deliverySearchValue, setDeliverySearchValue] = useState('')
-  const [activeLocation, setActiveLocation] = useState('pickup')
   const [aracBilgileri, setAracBilgileri] = useState({
     marka: '',
     model: '',
@@ -70,7 +71,6 @@ export default function OzelCekiciModal({ onClose }) {
   const [routeInfo, setRouteInfo] = useState(null)
   const [directions, setDirections] = useState(null)
   const [pnrNumber, setPnrNumber] = useState(null)
-  const [activeMapPanel, setActiveMapPanel] = useState(null)
   const [vehicleData, setVehicleData] = useState({
     aracMarkalari: [],
     aracModelleri: {},
@@ -268,127 +268,139 @@ export default function OzelCekiciModal({ onClose }) {
     }
   }, [pickupLocation, deliveryLocation])
 
-  // Adres arama ile konum seçimi
-  const handlePlaceChanged = async (e) => {
-    const place = e.detail.place
-    if (place && place.geometry) {
-      const newLocation = {
-        lat: place.geometry.location.lat,
-        lng: place.geometry.location.lng,
-        address: place.formatted_address
-      }
-
-      // Şehir bilgisini bul
-      let sehir = '';
-      for (const component of place.address_components) {
-        if (component.types.includes('administrative_area_level_1')) {
-          sehir = component.long_name;
-          break;
-        }
-      }
-
-      // Şehir fiyatlandırmasını getir
-      if (sehir) {
-        try {
-          const normalizedSehir = normalizeSehirAdi(sehir);
-          const response = await api.get(`/api/variables/ozel-cekici/sehirler/${normalizedSehir}`);
-          setSehirFiyatlandirma(response.data);
-        } catch (error) {
-          console.error('Şehir fiyatlandırması getirilemedi:', error);
-          setSehirFiyatlandirma(null);
-        }
-      }
-
-      if (activeLocation === 'pickup') {
-        setPickupLocation(newLocation)
-        setPickupSearchValue(place.formatted_address)
-      } else {
-        setDeliveryLocation(newLocation)
-        setDeliverySearchValue(place.formatted_address)
-      }
-      setActiveMapPanel(null) // Konum seçilince harita kapansın
+  const handleInputChange = async (e) => {
+    const value = e.target.value;
+    if (activeLocation === 'pickup') {
+      setPickupSearchValue(value);
+    } else {
+      setDeliverySearchValue(value);
     }
-  }
+  };
 
-  // Haritaya tıklayınca konum seçimi
-  const handleMapClick = async (e) => {
-    const lat = e.latLng.lat()
-    const lng = e.latLng.lng()
-    const address = await getAddressFromLatLng(lat, lng)
-    const newLocation = { lat, lng, address }
+  const handlePredictionSelect = async (prediction) => {
+    if (!window.google) return;
 
-    // Google Maps Geocoder ile şehir bilgisini al
-    const geocoder = new window.google.maps.Geocoder()
-    geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
-      if (status === 'OK' && results[0]) {
-        let sehir = '';
-        for (const component of results[0].address_components) {
-          if (component.types.includes('administrative_area_level_1')) {
-            sehir = component.long_name;
-            break;
-          }
-        }
+    const geocoder = new window.google.maps.Geocoder();
+    try {
+      const result = await geocoder.geocode({ placeId: prediction.place_id });
+      if (result.results[0]) {
+        const location = {
+          lat: result.results[0].geometry.location.lat(),
+          lng: result.results[0].geometry.location.lng(),
+          address: result.results[0].formatted_address
+        };
 
-        // Şehir fiyatlandırmasını getir
-        if (sehir) {
-          try {
-            const normalizedSehir = normalizeSehirAdi(sehir);
-            const response = await api.get(`/api/variables/ozel-cekici/sehirler/${normalizedSehir}`);
-            setSehirFiyatlandirma(response.data);
-          } catch (error) {
-            console.error('Şehir fiyatlandırması getirilemedi:', error);
-            setSehirFiyatlandirma(null);
-          }
+        if (activeLocation === 'pickup') {
+          setPickupLocation(location);
+          setPickupSearchValue(location.address);
+        } else {
+          setDeliveryLocation(location);
+          setDeliverySearchValue(location.address);
         }
       }
-    });
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+  };
+
+  const handleMapClick = async (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const address = await getAddressFromLatLng(lat, lng);
+    const newLocation = { lat, lng, address };
 
     if (activeLocation === 'pickup') {
-      setPickupLocation(newLocation)
-      setPickupSearchValue(address)
+      setPickupLocation(newLocation);
+      setPickupSearchValue(address);
     } else {
-      setDeliveryLocation(newLocation)
-      setDeliverySearchValue(address)
+      setDeliveryLocation(newLocation);
+      setDeliverySearchValue(address);
     }
-    setActiveMapPanel(null) // Konum seçilince harita kapansın
-  }
+    setActiveMapPanel(null);
+  };
 
-  // Konumumu kullan
-  const handleCurrentLocation = useCallback((target) => {
+  const handleCurrentLocation = async (target) => {
     if (!navigator.geolocation) {
       toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
       return;
     }
 
     // Önce izinleri kontrol et
-    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      
       if (permissionStatus.state === 'denied') {
         toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
         return;
       }
 
       // Konum alma işlemini başlat
-      toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      const loadingToast = toast.loading('Konumunuz alınıyor...', { id: 'location' });
       
+      // Konum alma seçenekleri
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      // Önce yüksek hassasiyetle deneyelim
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords;
-          const address = await getAddressFromLatLng(latitude, longitude);
-          const newLocation = { lat: latitude, lng: longitude, address };
-          
-          if (target === 'pickup') {
-            setPickupLocation(newLocation);
-            setPickupSearchValue(address);
-          } else {
-            setDeliveryLocation(newLocation);
-            setDeliverySearchValue(address);
+          try {
+            const { latitude, longitude } = position.coords;
+            const address = await getAddressFromLatLng(latitude, longitude);
+            const newLocation = { lat: latitude, lng: longitude, address };
+            
+            if (target === 'pickup') {
+              setPickupLocation(newLocation);
+              setPickupSearchValue(address);
+            } else {
+              setDeliveryLocation(newLocation);
+              setDeliverySearchValue(address);
+            }
+            setActiveMapPanel(null);
+            
+            toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+          } catch (error) {
+            console.error('Address lookup error:', error);
+            toast.error('Adres bilgisi alınamadı. Lütfen manuel olarak girin.', { id: 'location' });
           }
-          setActiveMapPanel(null);
-          
-          toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
         },
-        (error) => {
+        async (error) => {
           console.error('Geolocation error:', error);
+          
+          // İlk deneme başarısız olursa, düşük hassasiyetle tekrar deneyelim
+          if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
+            try {
+              const lowAccuracyPosition = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                  resolve,
+                  reject,
+                  { ...options, enableHighAccuracy: false }
+                );
+              });
+
+              const { latitude, longitude } = lowAccuracyPosition.coords;
+              const address = await getAddressFromLatLng(latitude, longitude);
+              const newLocation = { lat: latitude, lng: longitude, address };
+
+              if (target === 'pickup') {
+                setPickupLocation(newLocation);
+                setPickupSearchValue(address);
+              } else {
+                setDeliveryLocation(newLocation);
+                setDeliverySearchValue(address);
+              }
+              setActiveMapPanel(null);
+              
+              toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+              return;
+            } catch (retryError) {
+              console.error('Retry geolocation error:', retryError);
+            }
+          }
+
           let errorMessage = 'Konum alınamadı.';
           
           switch (error.code) {
@@ -396,32 +408,118 @@ export default function OzelCekiciModal({ onClose }) {
               errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun.';
+              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
               break;
             case error.TIMEOUT:
               errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
               break;
+            default:
+              errorMessage = 'Konum alınamadı. Lütfen manuel olarak girin.';
           }
           
           toast.error(errorMessage, { id: 'location' });
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
+        options
       );
-    });
-  }, []);
+    } catch (error) {
+      console.error('Permission check error:', error);
+      toast.error('Konum izni kontrol edilemedi. Lütfen manuel olarak girin.');
+    }
+  };
+
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      const pickupInput = document.getElementById('pickup-input');
+      const deliveryInput = document.getElementById('delivery-input');
+
+      if (pickupInput) {
+        const pickupAutocomplete = new window.google.maps.places.Autocomplete(pickupInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        pickupAutocomplete.addListener('place_changed', () => {
+          const place = pickupAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setPickupLocation(location);
+            setPickupSearchValue(location.address);
+          }
+        });
+      }
+
+      if (deliveryInput) {
+        const deliveryAutocomplete = new window.google.maps.places.Autocomplete(deliveryInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        deliveryAutocomplete.addListener('place_changed', () => {
+          const place = deliveryAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setDeliveryLocation(location);
+            setDeliverySearchValue(location.address);
+          }
+        });
+      }
+    }
+  }, [isLoaded]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (step === 1) {
+      // Konum kontrolleri
+      if (!pickupLocation) {
+        toast.error('Lütfen alınacak konumu seçin');
+        return;
+      }
+      
+      if (!deliveryLocation) {
+        toast.error('Lütfen teslim edilecek konumu seçin');
+        return;
+      }
+
+      // Araç bilgileri kontrolleri
+      if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
+        toast.error('Lütfen tüm araç bilgilerini doldurun');
+        return;
+      }
+
       setStep(2);
-      setActiveMapPanel('pickup');
     } else if (step === 2) {
+      if (!price) {
+        toast.error('Lütfen fiyat hesaplamasını bekleyin');
+        return;
+      }
       setStep(3);
     } else if (step === 3) {
+      // Müşteri bilgileri kontrolleri
+      if (musteriBilgileri.musteriTipi === 'kisisel') {
+        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
+          return;
+        }
+        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+          toast.error('Lütfen TC Kimlik numaranızı girin');
+          return;
+        }
+      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
+        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
+          return;
+        }
+      }
+
       await createOrder();
     }
   };
@@ -469,8 +567,8 @@ export default function OzelCekiciModal({ onClose }) {
       const { data } = await api.post('/api/orders', orderData);
       console.log('API yanıtı:', data);
 
-      if (!data.pnr) {
-        throw new Error('PNR numarası alınamadı');
+      if (!data || !data.pnr) {
+        throw new Error('Talep numarası alınamadı');
       }
 
       setPnrNumber(data.pnr);
@@ -480,9 +578,11 @@ export default function OzelCekiciModal({ onClose }) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('lastPnr', data.pnr);
       }
+
+      toast.success('Siparişiniz başarıyla oluşturuldu!');
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error);
-      alert('Sipariş oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      toast.error('Sipariş oluşturulurken bir hata oluştu: ' + (error?.response?.data?.message || error?.message || 'Bilinmeyen hata'));
     }
   };
 
@@ -496,7 +596,7 @@ export default function OzelCekiciModal({ onClose }) {
           <select
             value={aracBilgileri.tip}
             onChange={(e) => setAracBilgileri({ ...aracBilgileri, tip: e.target.value })}
-            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors"
           >
             <option value="">Segment Seçin</option>
             {vehicleData?.segments?.map((segment) => (
@@ -621,25 +721,20 @@ export default function OzelCekiciModal({ onClose }) {
                     {isLoaded && (
                       <div className="w-full">
                         <input
+                          id="pickup-input"
                           type="text"
                           value={pickupSearchValue}
-                          onChange={e => setPickupSearchValue(e.target.value)}
-                          placeholder="Adres girin veya haritadan seçin"
-                          className="w-full pr-16 px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                          onClick={() => setActiveLocation('pickup')}
-                        />
-                        <gmp-place-autocomplete
-                          onPlaceChanged={handlePlaceChanged}
-                          placeholder="Adres girin veya haritadan seçin"
-                          style={{ display: 'none' }}
+                          onChange={handleInputChange}
+                          placeholder="Adres veya konum ara..."
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors"
                         />
                       </div>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 bg-[#141414] z-10">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                       <button
                         type="button"
                         onClick={() => handleCurrentLocation('pickup')}
-                        className="text-[#404040] hover:text-white transition-colors"
+                        className="p-2 text-[#404040] hover:text-white transition-colors bg-[#141414] rounded-lg hover:bg-[#202020]"
                         title="Mevcut Konumu Kullan"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,10 +745,19 @@ export default function OzelCekiciModal({ onClose }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setActiveLocation('pickup');
-                          setActiveMapPanel(activeMapPanel === 'pickup' ? null : 'pickup');
+                          if (activeMapPanel === 'pickup') {
+                            setActiveMapPanel(null);
+                            setActiveLocation(null);
+                          } else {
+                            setActiveMapPanel('pickup');
+                            setActiveLocation('pickup');
+                          }
                         }}
-                        className={`text-[#404040] hover:text-yellow-500 transition-colors ${activeMapPanel === 'pickup' ? 'text-yellow-500' : ''}`}
+                        className={`p-2 transition-colors bg-[#141414] rounded-lg hover:bg-[#202020] ${
+                          activeMapPanel === 'pickup'
+                            ? 'text-yellow-500 hover:text-yellow-400'
+                            : 'text-[#404040] hover:text-white'
+                        }`}
                         title="Haritadan Seç"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -673,25 +777,20 @@ export default function OzelCekiciModal({ onClose }) {
                     {isLoaded && (
                       <div className="w-full">
                         <input
+                          id="delivery-input"
                           type="text"
                           value={deliverySearchValue}
-                          onChange={e => setDeliverySearchValue(e.target.value)}
-                          placeholder="Adres girin veya haritadan seçin"
-                          className="w-full pr-16 px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                          onClick={() => setActiveLocation('delivery')}
-                        />
-                        <gmp-place-autocomplete
-                          onPlaceChanged={handlePlaceChanged}
-                          placeholder="Adres girin veya haritadan seçin"
-                          style={{ display: 'none' }}
+                          onChange={handleInputChange}
+                          placeholder="Adres veya konum ara..."
+                          className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors"
                         />
                       </div>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 bg-[#141414] z-10">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                       <button
                         type="button"
                         onClick={() => handleCurrentLocation('delivery')}
-                        className="text-[#404040] hover:text-white transition-colors"
+                        className="p-2 text-[#404040] hover:text-white transition-colors bg-[#141414] rounded-lg hover:bg-[#202020]"
                         title="Mevcut Konumu Kullan"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -702,10 +801,19 @@ export default function OzelCekiciModal({ onClose }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setActiveLocation('delivery');
-                          setActiveMapPanel(activeMapPanel === 'delivery' ? null : 'delivery');
+                          if (activeMapPanel === 'delivery') {
+                            setActiveMapPanel(null);
+                            setActiveLocation(null);
+                          } else {
+                            setActiveMapPanel('delivery');
+                            setActiveLocation('delivery');
+                          }
                         }}
-                        className={`text-[#404040] hover:text-yellow-500 transition-colors ${activeMapPanel === 'delivery' ? 'text-yellow-500' : ''}`}
+                        className={`p-2 transition-colors bg-[#141414] rounded-lg hover:bg-[#202020] ${
+                          activeMapPanel === 'delivery'
+                            ? 'text-yellow-500 hover:text-yellow-400'
+                            : 'text-[#404040] hover:text-white'
+                        }`}
                         title="Haritadan Seç"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,7 +824,7 @@ export default function OzelCekiciModal({ onClose }) {
                   </div>
                 </div>
 
-                {isLoaded && activeMapPanel === activeLocation && (
+                {isLoaded && activeMapPanel && activeMapPanel === activeLocation && (
                   <div style={mapStyles} className="relative mt-2">
                     <GoogleMap
                       mapContainerStyle={mapStyles}
@@ -931,7 +1039,7 @@ export default function OzelCekiciModal({ onClose }) {
                         value={musteriBilgileri.firmaAdi}
                         onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, firmaAdi: e.target.value })}
                         required
-                        className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Firma Adı"
                       />
                     </div>
@@ -944,7 +1052,7 @@ export default function OzelCekiciModal({ onClose }) {
                         value={musteriBilgileri.vergiNo}
                         onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, vergiNo: e.target.value })}
                         required
-                        className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Vergi Numarası"
                       />
                     </div>
@@ -957,7 +1065,7 @@ export default function OzelCekiciModal({ onClose }) {
                         value={musteriBilgileri.vergiDairesi}
                         onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, vergiDairesi: e.target.value })}
                         required
-                        className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Vergi Dairesi"
                       />
                     </div>
@@ -973,7 +1081,7 @@ export default function OzelCekiciModal({ onClose }) {
                         value={musteriBilgileri.ad}
                         onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, ad: e.target.value })}
                         required
-                        className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Adınız"
                       />
                     </div>
@@ -986,7 +1094,7 @@ export default function OzelCekiciModal({ onClose }) {
                         value={musteriBilgileri.soyad}
                         onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, soyad: e.target.value })}
                         required
-                        className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         placeholder="Soyadınız"
                       />
                     </div>
@@ -1051,7 +1159,7 @@ export default function OzelCekiciModal({ onClose }) {
                     }}
                     required
                     maxLength={11}
-                    className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     placeholder="05XX XXX XX XX"
                   />
                 </div>
@@ -1064,7 +1172,7 @@ export default function OzelCekiciModal({ onClose }) {
                     value={musteriBilgileri.email}
                     onChange={(e) => setMusteriBilgileri({ ...musteriBilgileri, email: e.target.value })}
                     required
-                    className="w-full px-4 py-2.5 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     placeholder="ornek@email.com"
                   />
                 </div>

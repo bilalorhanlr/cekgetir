@@ -4,13 +4,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CarSegment, CarStatus, YolYardim, TopluCekiciSehir } from './variables.entity';
 import { CarStatusType } from './car-status-type';
 import { Query } from '@nestjs/common';
-import { VariablesSeedService } from './variables-seed.service';
 
 @Controller('variables')
 export class VariablesController {
   constructor(
     private readonly variablesService: VariablesService,
-    private readonly variablesSeedService: VariablesSeedService
   ) {}
 
   // Car Segment Operations
@@ -423,13 +421,6 @@ export class VariablesController {
       updateDto.maxKm,
       updateDto.kmBasiUcret
     );
-  }
-
-  @Post('seed')
-  @UseGuards(JwtAuthGuard)
-  async seed() {
-    await this.variablesSeedService.seed();
-    return { message: 'Seed completed successfully' };
   }
 
 } 

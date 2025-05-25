@@ -433,7 +433,7 @@ export default function YolYardimModal({ onClose }) {
   // Konumumu kullan
   const handleCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
+      toast.error('Tarayıcınız konum özelliğini desteklemiyor.Lütfen haritadan seçiniz.');
       return;
     }
 
@@ -445,40 +445,64 @@ export default function YolYardimModal({ onClose }) {
       }
 
       // Konum alma işlemini başlat
-      toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      const loadingToast = toast.loading('Konumunuz alınıyor...', { id: 'location' });
       
+      // Konum alma seçenekleri
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      // Önce yüksek hassasiyetle deneyelim
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          if (window.google) {
-            const geocoder = new window.google.maps.Geocoder();
-            try {
-              const result = await geocoder.geocode({ location: { lat: latitude, lng: longitude } });
-              if (result.results[0]) {
-                const place = result.results[0];
-                const newLocation = {
-                  lat: latitude,
-                  lng: longitude,
-                  address: place.formatted_address
-                };
-                
-                setLocation(newLocation);
-                setSearchValue(place.formatted_address);
-                calculateRoute(newLocation);
-                setShowAutocomplete(false);
-                setPredictions([]);
-                
-                toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
-              }
-            } catch (error) {
-              console.error('Geocoding error:', error);
-              toast.error('Adres bilgisi alınamadı.', { id: 'location' });
-            }
+          try {
+            const { latitude, longitude } = position.coords;
+            const address = await getAddressFromLatLng(latitude, longitude);
+            const newLocation = { lat: latitude, lng: longitude, address };
+            
+            setLocation(newLocation);
+            setSearchValue(address);
+            setShowMap(null);
+            calculateRoute(newLocation);
+            
+            toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+          } catch (error) {
+            console.error('Address lookup error:', error);
+            toast.error('Adres bilgisi alınamadı. Lütfen manuel olarak girin.', { id: 'location' });
           }
         },
-        (error) => {
+        async (error) => {
           console.error('Geolocation error:', error);
+          
+          // İlk deneme başarısız olursa, düşük hassasiyetle tekrar deneyelim
+          if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
+            try {
+              const lowAccuracyPosition = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                  resolve,
+                  reject,
+                  { ...options, enableHighAccuracy: false }
+                );
+              });
+
+              const { latitude, longitude } = lowAccuracyPosition.coords;
+              const address = await getAddressFromLatLng(latitude, longitude);
+              const newLocation = { lat: latitude, lng: longitude, address };
+              
+              setLocation(newLocation);
+              setSearchValue(address);
+              setShowMap(null);
+              calculateRoute(newLocation);
+              
+              toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+              return;
+            } catch (retryError) {
+              console.error('Retry geolocation error:', retryError);
+            }
+          }
+
           let errorMessage = 'Konum alınamadı.';
           
           switch (error.code) {
@@ -486,23 +510,21 @@ export default function YolYardimModal({ onClose }) {
               errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun.';
+              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
               break;
             case error.TIMEOUT:
               errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
               break;
+            default:
+              errorMessage = 'Konum alınamadı. Lütfen manuel olarak girin.';
           }
           
           toast.error(errorMessage, { id: 'location' });
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
+        options
       );
     });
-  }, [calculateRoute]);
+  }, [calculateRoute, getAddressFromLatLng]);
 
   const handleArizaSelect = (ariza) => {
     setSelectedAriza(ariza)
@@ -512,33 +534,34 @@ export default function YolYardimModal({ onClose }) {
     e.preventDefault();
     
     if (step === 1) {
+      // Konum kontrolü
       if (!location) {
-        toast.error('Lütfen bir konum seçin');
+        toast.error('Lütfen konum seçin');
         return;
       }
-      
-      // Sadece Devam Et butonuna tıklandığında bir sonraki adıma geç
-      if (e.nativeEvent.submitter && e.nativeEvent.submitter.type === 'submit') {
-        setStep(2);
+
+      // Arıza kontrolü
+      if (!selectedAriza) {
+        toast.error('Lütfen arıza türünü seçin');
+        return;
       }
-    } else if (step === 2) {
+
+      // Araç bilgileri kontrolü
       if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
         toast.error('Lütfen tüm araç bilgilerini doldurun');
         return;
       }
 
-      if (!selectedAriza) {
-        toast.error('Lütfen arıza tipini seçin');
-        return;
-      }
-
-      setStep(3);
-    } else if (step === 3) {
+      setStep(2);
+    } else if (step === 2) {
+      // Fiyat kontrolü
       if (!price) {
         toast.error('Lütfen fiyat hesaplamasını bekleyin');
         return;
       }
-
+      setStep(3);
+    } else if (step === 3) {
+      // Müşteri bilgileri kontrolü
       if (musteriBilgileri.musteriTipi === 'kisisel') {
         if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
           toast.error('Lütfen tüm zorunlu alanları doldurun');
@@ -548,9 +571,9 @@ export default function YolYardimModal({ onClose }) {
           toast.error('Lütfen TC Kimlik numaranızı girin');
           return;
         }
-      } else {
+      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
         if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm zorunlu alanları doldurun');
+          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
           return;
         }
       }
@@ -594,7 +617,7 @@ export default function YolYardimModal({ onClose }) {
       console.log('API yanıtı:', response);
 
       if (!response.data || !response.data.pnr) {
-        throw new Error('Talep alınamadı!');
+        throw new Error('Talep numarası alınamadı');
       }
 
       setPnrNumber(response.data.pnr);
@@ -605,9 +628,10 @@ export default function YolYardimModal({ onClose }) {
       }
 
       setStep(4);
+      toast.success('Siparişiniz başarıyla oluşturuldu!');
     } catch (error) {
-      alert('Sipariş oluşturulurken hata: ' + (error?.message || ''));
       console.error('Sipariş oluşturma hatası:', error);
+      toast.error('Sipariş oluşturulurken bir hata oluştu: ' + (error?.response?.data?.message || error?.message || 'Bilinmeyen hata'));
     }
   };
 

@@ -5,6 +5,11 @@ import OzelCekiciModal from './ozel-cekici'
 import TopluCekiciModal from './toplu-cekici'
 import api from '@/utils/axios'
 import axios from 'axios'
+import { toast } from 'react-hot-toast'
+import { useLoadScript } from '@react-google-maps/api'
+
+const libraries = ['places']
+
 export default function SehirlerArasiModal({ onClose }) {
   const [step, setStep] = useState(1)
   const [selectedService, setSelectedService] = useState(null)
@@ -28,6 +33,15 @@ export default function SehirlerArasiModal({ onClose }) {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [activeLocation, setActiveLocation] = useState(null)
+  const [activeMapPanel, setActiveMapPanel] = useState(null)
+  const [pickupSearchValue, setPickupSearchValue] = useState('')
+  const [deliverySearchValue, setDeliverySearchValue] = useState('')
+
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    libraries
+  })
 
   useEffect(() => {
     const fetchData = async () => {
@@ -127,7 +141,7 @@ export default function SehirlerArasiModal({ onClose }) {
     
     if (step === 1) {
       if (!selectedService) {
-        alert('Lütfen bir hizmet seçin');
+        toast.error('Lütfen bir hizmet seçin');
         return;
       }
 
@@ -139,32 +153,50 @@ export default function SehirlerArasiModal({ onClose }) {
         return;
       }
     } else if (step === 2) {
-      if (araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment)) {
-        alert('Lütfen en az bir araç seçin');
+      // Konum kontrolleri
+      if (!pickupLocation) {
+        toast.error('Lütfen alınacak konumu seçin');
+        return;
+      }
+      
+      if (!deliveryLocation) {
+        toast.error('Lütfen teslim edilecek konumu seçin');
+        return;
+      }
+
+      // Araç kontrolleri
+      if (araclar.length === 0) {
+        toast.error('Lütfen en az bir araç ekleyin');
+        return;
+      }
+
+      if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment)) {
+        toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
         return;
       }
 
       setStep(3);
     } else if (step === 3) {
       if (!toplamFiyat) {
-        alert('Lütfen fiyat hesaplamasını bekleyin');
+        toast.error('Lütfen fiyat hesaplamasını bekleyin');
         return;
       }
 
       setStep(4);
     } else if (step === 4) {
+      // Müşteri bilgileri kontrolleri
       if (musteriBilgileri.musteriTipi === 'kisisel') {
         if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
           return;
         }
         if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          alert('Lütfen TC Kimlik numaranızı girin');
+          toast.error('Lütfen TC Kimlik numaranızı girin');
           return;
         }
       } else {
         if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
           return;
         }
       }
@@ -191,6 +223,212 @@ export default function SehirlerArasiModal({ onClose }) {
     yeniAraclar[index] = { ...yeniAraclar[index], [field]: value }
     setAraclar(yeniAraclar)
   }
+
+  const handleInputChange = async (e) => {
+    const value = e.target.value;
+    if (activeLocation === 'pickup') {
+      setPickupSearchValue(value);
+    } else {
+      setDeliverySearchValue(value);
+    }
+  };
+
+  const handlePredictionSelect = async (prediction) => {
+    if (!window.google) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    try {
+      const result = await geocoder.geocode({ placeId: prediction.place_id });
+      if (result.results[0]) {
+        const location = {
+          lat: result.results[0].geometry.location.lat(),
+          lng: result.results[0].geometry.location.lng(),
+          address: result.results[0].formatted_address
+        };
+
+        if (activeLocation === 'pickup') {
+          setPickupLocation(location);
+          setPickupSearchValue(location.address);
+        } else {
+          setDeliveryLocation(location);
+          setDeliverySearchValue(location.address);
+        }
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+  };
+
+  const handleMapClick = async (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const address = await getAddressFromLatLng(lat, lng);
+    const newLocation = { lat, lng, address };
+
+    if (activeLocation === 'pickup') {
+      setPickupLocation(newLocation);
+      setPickupSearchValue(address);
+    } else {
+      setDeliveryLocation(newLocation);
+      setDeliverySearchValue(address);
+    }
+    setActiveMapPanel(null);
+  };
+
+  const handleCurrentLocation = async (target) => {
+    if (!navigator.geolocation) {
+      toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
+      return;
+    }
+
+    // Önce izinleri kontrol et
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      
+      if (permissionStatus.state === 'denied') {
+        toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
+        return;
+      }
+
+      // Konum alma işlemini başlat
+      const loadingToast = toast.loading('Konumunuz alınıyor...', { id: 'location' });
+      
+      // Konum alma seçenekleri
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      // Önce yüksek hassasiyetle deneyelim
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const address = await getAddressFromLatLng(latitude, longitude);
+            const newLocation = { lat: latitude, lng: longitude, address };
+            
+            if (target === 'pickup') {
+              setPickupLocation(newLocation);
+              setPickupSearchValue(address);
+            } else {
+              setDeliveryLocation(newLocation);
+              setDeliverySearchValue(address);
+            }
+            setActiveMapPanel(null);
+            
+            toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+          } catch (error) {
+            console.error('Address lookup error:', error);
+            toast.error('Adres bilgisi alınamadı. Lütfen manuel olarak girin.', { id: 'location' });
+          }
+        },
+        async (error) => {
+          console.error('Geolocation error:', error);
+          
+          // İlk deneme başarısız olursa, düşük hassasiyetle tekrar deneyelim
+          if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
+            try {
+              const lowAccuracyPosition = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                  resolve,
+                  reject,
+                  { ...options, enableHighAccuracy: false }
+                );
+              });
+
+              const { latitude, longitude } = lowAccuracyPosition.coords;
+              const address = await getAddressFromLatLng(latitude, longitude);
+              const newLocation = { lat: latitude, lng: longitude, address };
+
+              if (target === 'pickup') {
+                setPickupLocation(newLocation);
+                setPickupSearchValue(address);
+              } else {
+                setDeliveryLocation(newLocation);
+                setDeliverySearchValue(address);
+              }
+              setActiveMapPanel(null);
+              
+              toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+              return;
+            } catch (retryError) {
+              console.error('Retry geolocation error:', retryError);
+            }
+          }
+
+          let errorMessage = 'Konum alınamadı.';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
+              break;
+            default:
+              errorMessage = 'Konum alınamadı. Lütfen manuel olarak girin.';
+          }
+          
+          toast.error(errorMessage, { id: 'location' });
+        },
+        options
+      );
+    } catch (error) {
+      console.error('Permission check error:', error);
+      toast.error('Konum izni kontrol edilemedi. Lütfen manuel olarak girin.');
+    }
+  };
+
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      const pickupInput = document.getElementById('pickup-input');
+      const deliveryInput = document.getElementById('delivery-input');
+
+      if (pickupInput) {
+        const pickupAutocomplete = new window.google.maps.places.Autocomplete(pickupInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        pickupAutocomplete.addListener('place_changed', () => {
+          const place = pickupAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setPickupLocation(location);
+            setPickupSearchValue(location.address);
+          }
+        });
+      }
+
+      if (deliveryInput) {
+        const deliveryAutocomplete = new window.google.maps.places.Autocomplete(deliveryInput, {
+          types: ['address'],
+          componentRestrictions: { country: 'tr' }
+        });
+
+        deliveryAutocomplete.addListener('place_changed', () => {
+          const place = deliveryAutocomplete.getPlace();
+          if (place.geometry) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              address: place.formatted_address
+            };
+            setDeliveryLocation(location);
+            setDeliverySearchValue(location.address);
+          }
+        });
+      }
+    }
+  }, [isLoaded]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
