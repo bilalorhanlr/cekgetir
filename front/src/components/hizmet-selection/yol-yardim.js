@@ -535,11 +535,11 @@ export default function YolYardimModal({ onClose }) {
       console.log('API yanıtı:', response);
 
       if (!response.data || !response.data.pnr) {
-        throw new Error('PNR alınamadı!');
+        throw new Error('Talep alınamadı!');
       }
 
       setPnrNumber(response.data.pnr);
-      console.log('PNR:', response.data.pnr);
+      console.log('Talep:', response.data.pnr);
       
       if (typeof window !== 'undefined') {
         localStorage.setItem('lastPnr', response.data.pnr);
@@ -1046,7 +1046,7 @@ export default function YolYardimModal({ onClose }) {
                   Siparişiniz başarıyla oluşturuldu. Aşağıdaki bilgileri kullanarak ödemenizi yapabilirsiniz.
                 </p>
                 <div className="bg-[#141414] rounded-lg p-4 mb-4">
-                  <div className="text-[#404040] text-sm mb-1">PNR Numaranız</div>
+                  <div className="text-[#404040] text-sm mb-1">Talep Numaranız</div>
                   <div className="text-3xl font-bold text-yellow-500 tracking-wider">{pnrNumber || 'Yükleniyor...'}</div>
                   <div className="text-[#404040] text-xs mt-2">
                     Bu numarayı kullanarak siparişinizi takip edebilirsiniz
@@ -1073,7 +1073,7 @@ export default function YolYardimModal({ onClose }) {
                     </div>
                     <div className="bg-[#202020] rounded-lg p-3">
                       <div className="text-[#404040] text-sm mb-1">Açıklama</div>
-                      <div className="text-white font-medium">PNR: {pnrNumber}</div>
+                      <div className="text-white font-medium">Talep: {pnrNumber}</div>
                     </div>
                   </div>
                 </div>
@@ -1121,7 +1121,7 @@ export default function YolYardimModal({ onClose }) {
                     <svg className="w-5 h-5 text-yellow-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>PNR numaranızı kullanarak siparişinizin durumunu web sitemizden takip edebilirsiniz.</span>
+                    <span>Talep numaranızı kullanarak siparişinizin durumunu web sitemizden takip edebilirsiniz.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <svg className="w-5 h-5 text-yellow-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

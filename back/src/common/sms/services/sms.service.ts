@@ -77,7 +77,7 @@ export class SmsService {
             }
 
             if (!order.pnrNo) {
-                throw new Error('PNR numarası bulunamadı');
+                throw new Error('Talep numarası bulunamadı');
             }
 
             this.logger.log(`Sending order confirmation SMS for order ${order.pnrNo} to ${order.customerPhone}`);

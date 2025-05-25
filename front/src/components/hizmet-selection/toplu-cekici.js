@@ -637,7 +637,7 @@ export default function TopluCekiciModal({ onClose }) {
       const { data } = await api.post('/api/orders', orderData);
 
       if (!data || !data.pnr) {
-        throw new Error('PNR oluşturulamadı');
+        throw new Error('Talep oluşturulamadı');
       }
 
       setPnrNumber(data.pnr);
@@ -1091,7 +1091,7 @@ export default function TopluCekiciModal({ onClose }) {
           {step === 1 ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
-                <h3 className="text-lg font-semibold text-white mb-4">Alınacak Konum</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Aracı Bize Teslim Edeceğiniz Konum</h3>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <input
@@ -1102,7 +1102,7 @@ export default function TopluCekiciModal({ onClose }) {
                       className="w-4 h-4 text-yellow-500 bg-[#202020] border-[#404040] rounded focus:ring-yellow-500 focus:ring-2"
                     />
                     <label htmlFor="pickupOtopark" className="text-white">
-                      Otoparktan Alınacak
+                      Otoparka Teslim Edilecek
                     </label>
                   </div>
 
@@ -1186,7 +1186,7 @@ export default function TopluCekiciModal({ onClose }) {
               </div>
 
               <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
-                <h3 className="text-lg font-semibold text-white mb-4">Teslim Edilecek Konum</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Aracı Teslim Alacağımız Konum</h3>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <input
@@ -1197,7 +1197,7 @@ export default function TopluCekiciModal({ onClose }) {
                       className="w-4 h-4 text-yellow-500 bg-[#202020] border-[#404040] rounded focus:ring-yellow-500 focus:ring-2"
                     />
                     <label htmlFor="deliveryOtopark" className="text-white">
-                      Otoparka Teslim Edilecek
+                      Otoparktan Teslim Alınacak
                     </label>
                   </div>
 
@@ -1741,7 +1741,7 @@ export default function TopluCekiciModal({ onClose }) {
                 <h3 className="text-lg font-semibold text-white mb-4">Sipariş Tamamlandı</h3>
                 <div className="space-y-4">
                   <div className="bg-[#202020] rounded-lg p-3">
-                    <div className="text-[#404040] text-sm mb-1">PNR Numarası</div>
+                    <div className="text-[#404040] text-sm mb-1">Talep Numarası</div>
                     <div className="text-2xl font-bold text-yellow-500">{pnrNumber}</div>
                   </div>
                   <div className="bg-[#202020] rounded-lg p-3">
@@ -1763,7 +1763,7 @@ export default function TopluCekiciModal({ onClose }) {
                         <span className="font-medium">Hesap Sahibi:</span> Çekgetir A.Ş.
                       </div>
                       <div className="text-[#404040] text-sm mt-2">
-                        * Ödemenizi yaptıktan sonra dekontunuzu PNR numaranız ile birlikte info@cekgetir.com adresine göndermeniz gerekmektedir.
+                        * Ödemenizi yaptıktan sonra dekontunuzu Talep numaranız ile birlikte info@cekgetir.com adresine göndermeniz gerekmektedir.
                       </div>
                     </div>
                   </div>

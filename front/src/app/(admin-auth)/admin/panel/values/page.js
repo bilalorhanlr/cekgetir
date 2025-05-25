@@ -71,6 +71,17 @@ export default function ValuesPage() {
     'ozel-cekici': false,
     'toplu-cekici': false
   });
+  const [isSavingStatuses, setIsSavingStatuses] = useState({
+    'yol-yardim': false,
+    'ozel-cekici': false,
+    'toplu-cekici': false
+  });
+  const [isSavingNumericValues, setIsSavingNumericValues] = useState({
+    'yol-yardim': false,
+    'ozel-cekici': false,
+    'toplu-cekici': false
+  });
+  const [isSavingCity, setIsSavingCity] = useState({});
 
   const tabs = [
     { id: 'toplu-cekici', label: 'Toplu Çekici' },
@@ -197,15 +208,18 @@ export default function ValuesPage() {
 
   const handleOzelCekiciSehirUpdate = async (sehirAdi, basePrice, basePricePerKm) => {
     try {
+      setIsSavingCity(prev => ({ ...prev, [sehirAdi]: true }));
       await api.patch(`/api/variables/ozel-cekici/sehirler/${sehirAdi}`, {
         basePrice,
         basePricePerKm
       });
       await fetchOzelCekiciSehirler();
-      alert('Şehir fiyatlandırması başarıyla güncellendi!');
+      toast.success('Şehir fiyatlandırması başarıyla güncellendi!');
     } catch (error) {
       console.error('Error updating ozel cekici sehir:', error);
-      alert('Şehir fiyatlandırması güncellenirken bir hata oluştu!');
+      toast.error('Şehir fiyatlandırması güncellenirken bir hata oluştu!');
+    } finally {
+      setIsSavingCity(prev => ({ ...prev, [sehirAdi]: false }));
     }
   }
 
@@ -220,6 +234,7 @@ export default function ValuesPage() {
     ozelCekiciBasePricePerKm
   ) => {
     try {
+      setIsSavingCity(prev => ({ ...prev, [sehirAdi]: true }));
       await api.patch(`/api/variables/toplu-cekici/sehirler/${sehirAdi}`, {
         basePrice,
         basePricePerKm,
@@ -230,15 +245,18 @@ export default function ValuesPage() {
         ozelCekiciBasePricePerKm
       });
       await fetchTopluCekiciSehirler();
-      alert('Şehir bilgileri başarıyla güncellendi!');
+      toast.success('Şehir bilgileri başarıyla güncellendi!');
     } catch (error) {
       console.error('Error updating toplu çekici sehir:', error);
-      alert('Şehir bilgileri güncellenirken bir hata oluştu!');
+      toast.error('Şehir bilgileri güncellenirken bir hata oluştu!');
+    } finally {
+      setIsSavingCity(prev => ({ ...prev, [sehirAdi]: false }));
     }
   };
 
   const handleSaveNumericValues = async (type) => {
     try {
+      setIsSavingNumericValues(prev => ({ ...prev, [type]: true }));
       if (type === 'yol-yardim') {
         await api.patch(`/api/variables/yol-yardim`, variables.yolYardim);
       } else if (type === 'ozel-cekici') {
@@ -246,10 +264,12 @@ export default function ValuesPage() {
       } else {
         await api.post(`/api/variables/${type}`, variables[type === 'toplu-cekici' ? 'topluCekici' : 'ozelCekici']);
       }
-      alert('Değerler başarıyla kaydedildi!');
+      toast.success('Değerler başarıyla kaydedildi!');
     } catch (error) {
       console.error('Error saving numeric values:', error);
-      alert('Değerler kaydedilirken bir hata oluştu!');
+      toast.error('Değerler kaydedilirken bir hata oluştu!');
+    } finally {
+      setIsSavingNumericValues(prev => ({ ...prev, [type]: false }));
     }
   };
 
@@ -356,6 +376,7 @@ export default function ValuesPage() {
 
   const handleSaveCarStatuses = async (type) => {
     try {
+      setIsSavingStatuses(prev => ({ ...prev, [type]: true }));
       if (!carStatuses[type] || !Array.isArray(carStatuses[type])) {
         throw new Error('Geçerli status verisi bulunamadı');
       }
@@ -429,6 +450,8 @@ export default function ValuesPage() {
     } catch (error) {
       console.error(`Frontend - Error saving ${type} statuses:`, error);
       toast.error(`${type} durumları kaydedilirken bir hata oluştu: ${error.message}`);
+    } finally {
+      setIsSavingStatuses(prev => ({ ...prev, [type]: false }));
     }
   }
 
@@ -700,9 +723,14 @@ export default function ValuesPage() {
                         sehir.ozelCekiciBasePrice,
                         sehir.ozelCekiciBasePricePerKm
                       )}
-                      className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+                      disabled={isSavingCity[sehir.sehirAdi]}
+                      className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
                     >
-                      Kaydet
+                      {isSavingCity[sehir.sehirAdi] ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : 'Kaydet'}
                     </button>
                   </div>
                 </div>
@@ -819,9 +847,13 @@ export default function ValuesPage() {
             </div>
             <button
               onClick={() => handleSaveCarStatuses('toplu-cekici')}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
             >
-              Değişiklikleri Kaydet
+              {isSavingStatuses['toplu-cekici'] ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : 'Değişiklikleri Kaydet'}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -860,9 +892,14 @@ export default function ValuesPage() {
             <h2 className="text-xl font-bold text-white">Temel Değerler</h2>
             <button
               onClick={() => handleSaveNumericValues('yol-yardim')}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+              disabled={isSavingNumericValues['yol-yardim']}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
             >
-              Değişiklikleri Kaydet
+              {isSavingNumericValues['yol-yardim'] ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : 'Değişiklikleri Kaydet'}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -984,9 +1021,14 @@ export default function ValuesPage() {
             <h2 className="text-xl font-bold text-white">Segment Katsayıları</h2>
             <button
               onClick={() => handleSaveCarSegments('yol-yardim')}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+              disabled={isSavingSegments['yol-yardim']}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
             >
-              Değişiklikleri Kaydet
+              {isSavingSegments['yol-yardim'] ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : 'Değişiklikleri Kaydet'}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1020,9 +1062,13 @@ export default function ValuesPage() {
             <h2 className="text-xl font-bold text-white">Durum Katsayıları</h2>
             <button
               onClick={() => handleSaveCarStatuses('yol-yardim')}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
             >
-              Değişiklikleri Kaydet
+              {isSavingStatuses['yol-yardim'] ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : 'Değişiklikleri Kaydet'}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1058,35 +1104,58 @@ export default function ValuesPage() {
         {/* Temel Değerler Kartı */}
         <div className="bg-[#1a1a1a] rounded-xl p-6 shadow-lg border border-[#2a2a2a]">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white">Temel Değerler</h2>
+            <div>
+              <h2 className="text-xl font-bold text-white">Gece Ücreti Çarpanı</h2>
+              <p className="text-sm text-gray-400 mt-1">Özel çekici hizmetleri için gece ücreti çarpanı</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-400">x</span>
+              <span className="text-2xl font-bold text-yellow-500">{variables.ozelCekici.nightPrice}</span>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <input
+                type="number"
+                value={variables.ozelCekici.nightPrice}
+                onChange={(e) => {
+                  setVariables(prev => ({
+                    ...prev,
+                    ozelCekici: {
+                      ...prev.ozelCekici,
+                      nightPrice: Number(e.target.value)
+                    }
+                  }));
+                }}
+                className="w-full px-4 py-3 bg-[#242424] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent text-lg"
+                placeholder="Gece ücreti çarpanı giriniz"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">x</span>
+            </div>
+            
             <button
               onClick={() => handleSaveNumericValues('ozel-cekici')}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+              disabled={isSavingNumericValues['ozel-cekici']}
+              className="w-full bg-yellow-600 text-white py-3 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] disabled:opacity-50 transition-all duration-200 flex items-center justify-center space-x-2"
             >
-              Değişiklikleri Kaydet
+              {isSavingNumericValues['ozel-cekici'] ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Kaydediliyor...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span>Kaydet</span>
+                </>
+              )}
             </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-[#242424] rounded-lg p-4 border border-[#333333]">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Gece Ücreti Çarpanı</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={variables.ozelCekici.nightPrice}
-                  onChange={(e) => {
-                    setVariables(prev => ({
-                      ...prev,
-                      ozelCekici: {
-                        ...prev.ozelCekici,
-                        nightPrice: Number(e.target.value)
-                      }
-                    }));
-                  }}
-                  className="w-full px-4 py-2 bg-[#1a1a1a] border border-[#333333] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-transparent"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">x</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1162,9 +1231,14 @@ export default function ValuesPage() {
                     </div>
                     <button
                       onClick={() => handleOzelCekiciSehirUpdate(sehir.sehirAdi, sehir.basePrice, sehir.basePricePerKm)}
-                      className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium"
+                      disabled={isSavingCity[sehir.sehirAdi]}
+                      className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm font-medium relative"
                     >
-                      Kaydet
+                      {isSavingCity[sehir.sehirAdi] ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : 'Kaydet'}
                     </button>
                   </div>
                 </div>

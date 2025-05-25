@@ -26,7 +26,7 @@ export default function Footer() {
               </Link>
             </div>
             <p className="mt-4 text-gray-300 text-sm sm:text-base leading-relaxed">
-              7/24 profesyonel oto kurtarma ve yol yardım hizmetleri sunuyoruz.
+            Şehirler arası araç transferi, özel çekici ve yol yardım hizmetleri sunuyoruz.
             </p>
             <div className="mt-6 space-y-3">
               <a
@@ -128,27 +128,21 @@ export default function Footer() {
             <h3 className="text-lg sm:text-xl font-semibold mb-4 text-yellow-400">Hizmetlerimiz</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/#yol-yardim" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
+                <Link href="/#sehirler-arasi" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
                   <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-2 group-hover:scale-150 transition-transform"></span>
-                  Yol Yardım
+                  Şehirler Arası Taşıma
                 </Link>
               </li>
               <li>
                 <Link href="/#ozel-cekici" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
                   <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-2 group-hover:scale-150 transition-transform"></span>
-                  Oto Çekici
+                  Çekici Hizmeti
                 </Link>
               </li>
               <li>
-                <Link href="/#sehirler-arasi" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
+                <Link href="/#yol-yardim" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
                   <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-2 group-hover:scale-150 transition-transform"></span>
-                  Çoklu Çekici
-                </Link>
-              </li>
-              <li>
-                <Link href="/#agir-vasita" className="text-gray-300 hover:text-yellow-400 transition-colors text-sm sm:text-base flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-2 group-hover:scale-150 transition-transform"></span>
-                  Ağır Vasıta
+                  Yol Yardım
                 </Link>
               </li>
             </ul>

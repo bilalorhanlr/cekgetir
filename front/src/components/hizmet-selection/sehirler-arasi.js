@@ -106,7 +106,7 @@ export default function SehirlerArasiModal({ onClose }) {
       console.log('API yanıtı:', data);
 
       if (!data.pnr) {
-        throw new Error('PNR numarası alınamadı');
+        throw new Error('Talep numarası alınamadı');
       }
 
       setPnrNumber(data.pnr);

@@ -17,26 +17,6 @@ export default function Home() {
 
   const serviceOptions = [
     {
-      id: 'yol-yardim',
-      title: 'Yol Yardım',
-      description: 'Akü takviyesi, lastik değişimi vs.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      )
-    },
-    {
-      id: 'ozel-cekici',
-      title: 'Özel Çekici',
-      description: 'Araç çekme ve taşıma hizmetleri',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-      )
-    },
-    {
       id: 'sehirler-arasi',
       title: 'Şehirler Arası',
       description: 'Şehirler arası araç transferi',
@@ -45,15 +25,38 @@ export default function Home() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       )
+    },
+    {
+      id: 'ozel-cekici',
+      title: 'Çekici Hizmeti',
+      description: 'Araç çekme ve taşıma hizmetleri',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+      )
+    },
+    {
+      id: 'yol-yardim',
+      title: 'Yol Yardım',
+      description: 'Akü takviyesi, lastik değişimi vs.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      )
     }
+    
   ]
 
   return (
     <>
-      <Navbar />
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <Navbar />
+      </div>
       <main className="min-h-screen bg-white ">
         {/* Hero Section */}
-        <section className="relative min-h-[85vh] flex items-center">
+        <section className="relative min-h-[100vh] flex items-center">
           <div className="absolute inset-0 z-0">
             <Image
               src="/images/home.jpeg"
@@ -65,12 +68,12 @@ export default function Home() {
             <div className="absolute inset-0 bg-gradient-to-l from-black/95 via-black/75 to-black/30"></div>
           </div>
 
-          <div className="relative z-10 w-full max-w-7xl mx-auto px-4 flex flex-col lg:flex-row items-center">
+          <div className="relative z-10 w-full max-w-6xl mx-auto px-4 flex flex-col lg:flex-row items-center">
             {/* Sol taraf - Başlık ve Açıklama */}
-            <div className="w-full lg:w-2/3 mb-4 lg:mb-0 mt-16 lg:mt-0">
+            <div className="w-full lg:w-2/3 mb-4 lg:mb-0 mt-16 lg:mt-0 pr-24">
               <div className="text-white">
-                <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                  7/24 Yol Yardım Hizmetleri
+                <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                Şehirler Arası Araç Taşıma Ve Yol Yardım Hizmeti
                 </h1>
                 <p className="text-lg md:text-xl mb-8 text-gray-300">
                   Çekici, lastik, akü ve tüm yol yardım hizmetleriyle yanınızdayız
@@ -151,8 +154,8 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-4">Acil Yol Yardım</h3>
-                <p className="text-gray-600">Aracınızla ilgili her türlü acil durumda 7/24 yanınızdayız. Hızlı ve güvenilir yol yardım hizmeti.</p>
+                <h3 className="text-xl font-semibold mb-4">Yol Yardım</h3>
+                <p className="text-gray-600">Aracınız yolda kaldığında en hızlı yol yardım desteğini sağlıyoruz. İhtiyacınızı bize iletmeniz yeterli. Gerekli ekipleri sizin adınıza yönlendiriyoruz.</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
@@ -161,7 +164,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold mb-4">Çekici Hizmeti</h3>
-                <p className="text-gray-600">Arızalanan veya kaza yapan aracınızı istediğiniz yere güvenle taşıyoruz.</p>
+                <p className="text-gray-600">Aracınız mı çekilmeli? Konumunuza uygun çekiciyi hızlıca ayarlıyoruz. Süreci baştan sona biz takip ediyoruz.</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
@@ -169,8 +172,8 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-4">Lastik Yardımı</h3>
-                <p className="text-gray-600">Lastik patlaması, değişimi ve tamir hizmetleri ile yolda kalmayın.</p>
+                <h3 className="text-xl font-semibold mb-4">Şehirler Arası Transfer</h3>
+                <p className="text-gray-600">Aracınızı bir şehirden başka bir şehre taşıtmak mı istiyorsunuz? Talebinizi alıyor, sizin için en uygun firmayı görevlendiriyoruz. Siz sadece teslimat zamanını takip edin.</p>
               </div>
             </div>
           </div>
@@ -207,7 +210,7 @@ export default function Home() {
                   <span className="text-2xl font-bold text-yellow-400">4</span>
                 </div>
                 <h3 className="text-lg font-semibold mb-2 text-black">Yardım Alın</h3>
-                <p className="text-gray-600">Ekibimiz yanınızda olacak</p>
+                <p className="text-gray-600">Ekipler yanınızda olacak</p>
               </div>
             </div>
           </div>

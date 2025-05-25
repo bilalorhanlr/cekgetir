@@ -13,6 +13,7 @@ export default function OrdersPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [viewMode, setViewMode] = useState('grid')
 
   useEffect(() => {
     fetchOrders()
@@ -103,7 +104,7 @@ export default function OrdersPage() {
               <div className="relative flex-1 md:flex-none">
                 <input
                   type="text"
-                  placeholder="PNR, Müşteri veya Plaka ara..."
+                  placeholder="Talep No, Plaka ara..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-64 px-4 py-2.5 bg-[#202020] text-white rounded-lg border border-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all"
@@ -124,6 +125,24 @@ export default function OrdersPage() {
                 <option value="COMPLETED">Tamamlandı</option>
                 <option value="CANCELLED">İptal Edildi</option>
               </select>
+              <div className="flex items-center gap-2 bg-[#202020] rounded-lg border border-[#404040] p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#303030] text-yellow-500' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[#303030] text-yellow-500' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -155,30 +174,116 @@ export default function OrdersPage() {
                 Filtreleri Temizle
               </button>
             </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {filteredOrders.map((order) => (
+                <div key={order.id} className="bg-[#202020] rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <span className="font-mono text-white text-lg">{order.pnrNo}</span>
+                      <div className="mt-1 text-sm text-gray-400">
+                        {new Date(order.createdAt).toLocaleDateString('tr-TR')}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {getStatusBadge(order.status)}
+                      {getPaymentStatusBadge(order.paymentStatus)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-sm text-gray-400">Müşteri</div>
+                      <div className="text-white font-medium">
+                        {order.customerName} {order.customerSurname}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        {order.customerPhone}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-gray-400">Hizmet</div>
+                      <div className="text-white">
+                        {order.serviceType === 'YOL_YARDIM' ? 'Yol Yardım' :
+                         order.serviceType === 'OZEL_CEKICI' ? 'Özel Çekici' :
+                         'Toplu Çekici'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-gray-400">Araç</div>
+                      <div className="text-white font-medium">
+                        {order.vehicleBrand} {order.vehicleModel}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        {order.vehiclePlate}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-gray-400">Tutar</div>
+                      <div className="text-white font-medium text-lg">
+                        {order.price.toLocaleString('tr-TR')} TL
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-[#404040] flex items-center gap-2">
+                    <button 
+                      className="flex-1 px-3 py-2 bg-blue-500/20 text-blue-500 rounded-lg hover:bg-blue-500/30 transition-all font-medium relative"
+                      onClick={() => router.push(`/admin/panel/orders/${order.id}`)}
+                    >
+                      Detay
+                    </button>
+                    {order.status === 'PENDING' && (
+                      <button 
+                        className="flex-1 px-3 py-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30 transition-all font-medium relative"
+                        onClick={() => updateOrderStatus(order.id, 'CANCELLED')}
+                        disabled={updatingStatus}
+                      >
+                        {updatingStatus ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        ) : 'İptal'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="bg-[#202020] rounded-xl overflow-hidden shadow-lg">
+            <div className="bg-[#202020] rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-[#404040]">
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">PNR</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Müşteri</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Hizmet</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Araç</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Tarih</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Durum</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Ödeme</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">Tutar</th>
-                      <th className="px-6 py-4 font-medium whitespace-nowrap">İşlemler</th>
+                  <thead className="hidden md:table-header-group">
+                    <tr className="border-b border-[#404040]">
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Talep No</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Müşteri</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Araç</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Hizmet</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Tutar</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Durum</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">İşlemler</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-[#404040]">
                     {filteredOrders.map((order) => (
-                      <tr key={order.id} className="border-b border-[#404040] hover:bg-[#2a2a2a] transition-all">
-                        <td className="px-6 py-4">
-                          <span className="font-mono text-white">{order.pnrNo}</span>
+                      <tr key={order.id} className="hover:bg-[#2a2a2a] transition-colors block md:table-row">
+                        <td className="px-6 py-4 block md:table-cell">
+                          <div className="flex justify-between items-center md:block">
+                            <div className="font-mono text-white">{order.pnrNo}</div>
+                            <div className="md:hidden flex flex-col gap-2">
+                              {getStatusBadge(order.status)}
+                              {getPaymentStatusBadge(order.paymentStatus)}
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {new Date(order.createdAt).toLocaleDateString('tr-TR')}
+                          </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 block md:table-cell">
                           <div className="text-white font-medium">
                             {order.customerName} {order.customerSurname}
                           </div>
@@ -186,14 +291,7 @@ export default function OrdersPage() {
                             {order.customerPhone}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-white">
-                            {order.serviceType === 'YOL_YARDIM' ? 'Yol Yardım' :
-                             order.serviceType === 'OZEL_CEKICI' ? 'Özel Çekici' :
-                             'Toplu Çekici'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 block md:table-cell">
                           <div className="text-white font-medium">
                             {order.vehicleBrand} {order.vehicleModel}
                           </div>
@@ -201,34 +299,41 @@ export default function OrdersPage() {
                             {order.vehiclePlate}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-white whitespace-nowrap">
-                          {new Date(order.createdAt).toLocaleDateString('tr-TR')}
+                        <td className="px-6 py-4 text-white block md:table-cell">
+                          {order.serviceType === 'YOL_YARDIM' ? 'Yol Yardım' :
+                           order.serviceType === 'OZEL_CEKICI' ? 'Özel Çekici' :
+                           'Toplu Çekici'}
                         </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(order.status)}
-                        </td>
-                        <td className="px-6 py-4">
-                          {getPaymentStatusBadge(order.paymentStatus)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-white font-medium">
+                        <td className="px-6 py-4 block md:table-cell">
+                          <div className="text-white font-medium">
                             {order.price.toLocaleString('tr-TR')} TL
-                          </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 hidden md:table-cell">
+                          <div className="flex flex-col gap-2">
+                            {getStatusBadge(order.status)}
+                            {getPaymentStatusBadge(order.paymentStatus)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 block md:table-cell">
                           <div className="flex items-center gap-2">
                             <button 
-                              className="px-3 py-1.5 bg-blue-500/20 text-blue-500 rounded-lg hover:bg-blue-500/30 transition-all font-medium"
+                              className="flex-1 md:flex-none px-3 py-2 bg-blue-500/20 text-blue-500 rounded-lg hover:bg-blue-500/30 transition-all font-medium relative"
                               onClick={() => router.push(`/admin/panel/orders/${order.id}`)}
                             >
                               Detay
                             </button>
                             {order.status === 'PENDING' && (
                               <button 
-                                className="px-3 py-1.5 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30 transition-all font-medium"
+                                className="flex-1 md:flex-none px-3 py-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30 transition-all font-medium relative"
                                 onClick={() => updateOrderStatus(order.id, 'CANCELLED')}
+                                disabled={updatingStatus}
                               >
-                                İptal
+                                {updatingStatus ? (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                                  </div>
+                                ) : 'İptal'}
                               </button>
                             )}
                           </div>

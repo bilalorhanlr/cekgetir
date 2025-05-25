@@ -17,8 +17,8 @@ export class OrderController {
       this.logger.debug('Oluşturulan sipariş:', JSON.stringify(order, null, 2));
       
       if (!order || !order.pnrNo) {
-        this.logger.error('PNR oluşturulamadı:', order);
-        throw new Error('PNR oluşturulamadı');
+        this.logger.error('Talep numarası oluşturulamadı:', order);
+        throw new Error('Talep numarası oluşturulamadı');
       }
 
       return { pnr: order.pnrNo };
