@@ -14,6 +14,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [viewMode, setViewMode] = useState('grid')
+  
 
   useEffect(() => {
     fetchOrders()

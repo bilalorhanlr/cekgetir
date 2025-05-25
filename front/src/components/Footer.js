@@ -18,11 +18,11 @@ export default function Footer() {
                 <Image
                   src="/images/logo.png"
                   alt="Çekgetir Logo"
-                  width={40}
-                  height={40}
-                  className="w-8 h-8 sm:w-10 sm:h-10 transition-transform duration-300 group-hover:scale-110"
+                  width={400}
+                  height={400}
+                  className="w-auto h-10 sm:w-auto sm:h-14 transition-transform duration-300 group-hover:scale-110"
                 />
-                <span className="text-xl sm:text-2xl font-bold text-yellow-400 group-hover:text-yellow-300 transition-colors">Çekgetir</span>
+                <span className="text-xl sm:text-2xl font-bold text-yellow-400 group-hover:text-yellow-300 transition-colors"></span>
               </Link>
             </div>
             <p className="mt-4 text-gray-300 text-sm sm:text-base leading-relaxed">

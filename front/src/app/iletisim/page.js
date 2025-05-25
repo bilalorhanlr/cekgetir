@@ -84,8 +84,8 @@ export default function Contact() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">Adres</h3>
-                    <p className="text-sm sm:text-base text-gray-600">Ferhatpaşa, Anadolu Cd. No:74, 34888 Ataşehir/İstanbul</p>
+                    <h3 className="text-lg sm:text-xl font-semibold text-black mb-1 sm:mb-2">Adres</h3>
+                    <p className="text-sm sm:text-base text-black">Ferhatpaşa, Anadolu Cd. No:74, 34888 Ataşehir/İstanbul</p>
                   </div>
                 </div>
 
@@ -96,8 +96,8 @@ export default function Contact() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">Telefon</h3>
-                    <p className="text-sm sm:text-base text-gray-600">+90 540 490 10 00</p>
+                    <h3 className="text-lg sm:text-xl font-semibold text-black mb-1 sm:mb-2">Telefon</h3>
+                    <p className="text-sm sm:text-base text-black">+90 540 490 10 00</p>
                   </div>
                 </div>
 
@@ -108,8 +108,8 @@ export default function Contact() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">E-posta</h3>
-                    <p className="text-sm sm:text-base text-gray-600">info@cekgetir.com</p>
+                    <h3 className="text-lg sm:text-xl font-semibold text-black mb-1 sm:mb-2">E-posta</h3>
+                    <p className="text-sm sm:text-base text-black">info@cekgetir.com</p>
                   </div>
                 </div>
 
@@ -120,8 +120,8 @@ export default function Contact() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">Çalışma Saatleri</h3>
-                    <p className="text-sm sm:text-base text-gray-600">7/24 Hizmet</p>
+                    <h3 className="text-lg sm:text-xl font-semibold text-black mb-1 sm:mb-2">Çalışma Saatleri</h3>
+                    <p className="text-sm sm:text-base text-black">7/24 Hizmet</p>
                   </div>
                 </div>
               </div>

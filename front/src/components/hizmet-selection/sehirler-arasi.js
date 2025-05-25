@@ -24,7 +24,9 @@ export default function SehirlerArasiModal({ onClose }) {
   const [pickupOtopark, setPickupOtopark] = useState(null)
   const [deliveryOtopark, setDeliveryOtopark] = useState(null)
   const [araclar, setAraclar] = useState([])
-  const [musteriBilgileri, setMusteriBilgileri] = useState({})
+  const [musteriBilgileri, setMusteriBilgileri] = useState({
+    tcVatandasi: true
+  })
   const [vehicleData, setVehicleData] = useState({
     aracMarkalari: [],
     aracModelleri: {},
@@ -226,10 +228,14 @@ export default function SehirlerArasiModal({ onClose }) {
 
   const handleInputChange = async (e) => {
     const value = e.target.value;
-    if (activeLocation === 'pickup') {
+    const inputId = e.target.id;
+    
+    if (inputId === 'pickup-input') {
       setPickupSearchValue(value);
-    } else {
+      setActiveLocation('pickup');
+    } else if (inputId === 'delivery-input') {
       setDeliverySearchValue(value);
+      setActiveLocation('delivery');
     }
   };
 
@@ -429,6 +435,17 @@ export default function SehirlerArasiModal({ onClose }) {
       }
     }
   }, [isLoaded]);
+
+  // Add useEffect to show route map when both locations are selected
+  useEffect(() => {
+    if (
+      step === 2 &&
+      pickupLocation &&
+      deliveryLocation
+    ) {
+      setActiveMapPanel('route');
+    }
+  }, [step, pickupLocation, deliveryLocation]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">

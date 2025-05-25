@@ -351,9 +351,21 @@ export default function YolYardimModal({ onClose }) {
     }
   }, [araclar, routeInfo, calculatePrice]);
 
+  // İstanbul sınırları kontrolü
+  const isWithinIstanbul = (lat, lng) => {
+    return lat >= 40.8 && lat <= 41.5 && lng >= 28.4 && lng <= 29.5;
+  };
+
   // Konumdan adres reverse geocode için
   const getAddressFromLatLng = async (lat, lng) => {
     if (!window.google) return ''
+    
+    // İstanbul sınırları kontrolü
+    if (!isWithinIstanbul(lat, lng)) {
+      toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.');
+      return '';
+    }
+
     const geocoder = new window.google.maps.Geocoder()
     return new Promise((resolve) => {
       geocoder.geocode({ location: { lat, lng } }, (results, status) => {
@@ -376,7 +388,11 @@ export default function YolYardimModal({ onClose }) {
         const response = await autocompleteService.getPlacePredictions({
           input: value,
           componentRestrictions: { country: 'tr' },
-          types: ['address']
+          types: ['address'],
+          bounds: new window.google.maps.LatLngBounds(
+            { lat: 40.8, lng: 28.4 }, // Güneybatı
+            { lat: 41.5, lng: 29.5 }  // Kuzeydoğu
+          )
         })
         setPredictions(response.predictions)
         setShowAutocomplete(true)
@@ -397,9 +413,18 @@ export default function YolYardimModal({ onClose }) {
         const result = await geocoder.geocode({ placeId: prediction.place_id })
         if (result.results[0]) {
           const place = result.results[0]
+          const lat = place.geometry.location.lat()
+          const lng = place.geometry.location.lng()
+
+          // İstanbul sınırları kontrolü
+          if (!isWithinIstanbul(lat, lng)) {
+            toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.');
+            return;
+          }
+
           const newLocation = {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
+            lat,
+            lng,
             address: place.formatted_address
           }
           
@@ -419,6 +444,12 @@ export default function YolYardimModal({ onClose }) {
   const handleMapClick = async (e) => {
     const lat = e.latLng.lat()
     const lng = e.latLng.lng()
+    
+    // İstanbul sınırları kontrolü
+    if (!isWithinIstanbul(lat, lng)) {
+      toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.');
+      return;
+    }
     
     const address = await getAddressFromLatLng(lat, lng)
     
@@ -459,6 +490,13 @@ export default function YolYardimModal({ onClose }) {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
+
+            // İstanbul sınırları kontrolü
+            if (!isWithinIstanbul(latitude, longitude)) {
+              toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.', { id: 'location' });
+              return;
+            }
+
             const address = await getAddressFromLatLng(latitude, longitude);
             const newLocation = { lat: latitude, lng: longitude, address };
             
@@ -488,6 +526,13 @@ export default function YolYardimModal({ onClose }) {
               });
 
               const { latitude, longitude } = lowAccuracyPosition.coords;
+
+              // İstanbul sınırları kontrolü
+              if (!isWithinIstanbul(latitude, longitude)) {
+                toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.', { id: 'location' });
+                return;
+              }
+
               const address = await getAddressFromLatLng(latitude, longitude);
               const newLocation = { lat: latitude, lng: longitude, address };
               
@@ -634,6 +679,12 @@ export default function YolYardimModal({ onClose }) {
       toast.error('Sipariş oluşturulurken bir hata oluştu: ' + (error?.response?.data?.message || error?.message || 'Bilinmeyen hata'));
     }
   };
+
+  useEffect(() => {
+    if (step === 2 && routeInfo) {
+      setShowMap('route');
+    }
+  }, [step, routeInfo]);
 
   if (loadError) {
     return <div className="p-8 text-white">Harita yüklenemedi.</div>

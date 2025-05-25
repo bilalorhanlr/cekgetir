@@ -209,6 +209,16 @@ export default function OzelCekiciModal({ onClose }) {
     
     // Toplam fiyat hesaplama (durum ücreti toplama olarak ekleniyor)
     const totalPrice = ((basePrice + distanceMultiplier + statusPrice) * segmentMultiplier) * nightMultiplier;
+
+    console.log('Fiyat Hesaplama Detayları:', {
+      basePrice,
+      distanceMultiplier,
+      statusPrice,
+      segmentMultiplier,
+      nightMultiplier,
+      totalPrice: Math.round(totalPrice)
+    });
+
     setPrice(Math.round(totalPrice));
   }, [pickupLocation, deliveryLocation, aracBilgileri, routeInfo, pricingData, sehirFiyatlandirma]);
 
@@ -235,7 +245,8 @@ export default function OzelCekiciModal({ onClose }) {
     const request = {
       origin: new window.google.maps.LatLng(pickupLocation.lat, pickupLocation.lng),
       destination: new window.google.maps.LatLng(deliveryLocation.lat, deliveryLocation.lng),
-      travelMode: window.google.maps.TravelMode.DRIVING
+      travelMode: window.google.maps.TravelMode.DRIVING,
+      region: 'tr'
     }
 
     try {
@@ -253,6 +264,61 @@ export default function OzelCekiciModal({ onClose }) {
       const distance = route.legs[0].distance.value / 1000 // km
       const duration = route.legs[0].duration.value / 60 // dk
 
+      // Rota üzerinde köprü ve tünel kontrolü
+      const routePath = route.overview_path
+      
+      // Köprü ve tünel koordinatları
+      const firstBridgeLat = 41.0445  // 15 Temmuz Şehitler Köprüsü (1. köprü)
+      const firstBridgeLng = 29.0345
+      const secondBridgeLat = 41.0935 // Fatih Sultan Mehmet Köprüsü (2. köprü)
+      const secondBridgeLng = 29.0635
+      const thirdBridgeLat = 41.0785  // Yavuz Sultan Selim Köprüsü (3. köprü)
+      const thirdBridgeLng = 29.0935
+      const tunnelLat = 41.0082       // Avrasya Tüneli
+      const tunnelLng = 28.9784
+      const kuzeyMarmaraLat = 41.1234 // Kuzey Marmara Otoyolu
+      const kuzeyMarmaraLng = 29.1234
+
+      // Köprü ve tünel kullanım kontrolü
+      const isUsingFirstBridge = routePath.some(point => 
+        Math.abs(point.lat() - firstBridgeLat) < 0.01 && Math.abs(point.lng() - firstBridgeLng) < 0.01
+      )
+      const isUsingSecondBridge = routePath.some(point => 
+        Math.abs(point.lat() - secondBridgeLat) < 0.01 && Math.abs(point.lng() - secondBridgeLng) < 0.01
+      )
+      const isUsingThirdBridge = routePath.some(point => 
+        Math.abs(point.lat() - thirdBridgeLat) < 0.01 && Math.abs(point.lng() - thirdBridgeLng) < 0.01
+      )
+      const isUsingTunnel = routePath.some(point => 
+        Math.abs(point.lat() - tunnelLat) < 0.01 && Math.abs(point.lng() - tunnelLng) < 0.01
+      )
+      const isUsingKuzeyMarmara = routePath.some(point => 
+        Math.abs(point.lat() - kuzeyMarmaraLat) < 0.01 && Math.abs(point.lng() - kuzeyMarmaraLng) < 0.01
+      )
+
+      // Ek ücret hesaplama
+      let extraFee = 0
+      let bridgeMessage = ''
+
+      if (isUsingFirstBridge || isUsingTunnel) {
+        extraFee = 500
+        bridgeMessage = '15 Temmuz Şehitler Köprüsü veya Avrasya Tüneli'
+      } else if (isUsingSecondBridge) {
+        extraFee = 150
+        bridgeMessage = 'Fatih Sultan Mehmet Köprüsü'
+      } else if (isUsingThirdBridge) {
+        extraFee = 500
+        bridgeMessage = 'Yavuz Sultan Selim Köprüsü'
+      } else if (isUsingKuzeyMarmara) {
+        extraFee = 300
+        bridgeMessage = 'Kuzey Marmara Otoyolu'
+      }
+
+      // Ek ücret varsa ekle
+      if (extraFee > 0) {
+        setPrice(prevPrice => prevPrice + extraFee)
+      }
+
       setDirections(result)
       setRouteInfo({
         distance,
@@ -265,6 +331,7 @@ export default function OzelCekiciModal({ onClose }) {
       })
     } catch (error) {
       console.error('Error calculating route:', error)
+      toast.error('Rota hesaplanırken bir hata oluştu. Lütfen farklı bir rota deneyin.')
     }
   }, [pickupLocation, deliveryLocation])
 
@@ -531,6 +598,17 @@ export default function OzelCekiciModal({ onClose }) {
     }
   }, [pickupLocation, deliveryLocation, isLoaded, calculateRoute])
 
+  // Add useEffect to show route map when both locations are selected
+  useEffect(() => {
+    if (
+      step === 2 &&
+      pickupLocation &&
+      deliveryLocation
+    ) {
+      setActiveMapPanel('route');
+    }
+  }, [step, pickupLocation, deliveryLocation]);
+
   // Sipariş oluşturma fonksiyonu
   const createOrder = async () => {
     try {
@@ -556,7 +634,7 @@ export default function OzelCekiciModal({ onClose }) {
           vergiDairesi: musteriBilgileri.vergiDairesi
         },
         pickupLocation: pickupLocation.address,
-        dropoffLocation: deliveryLocation.address,
+        deliveryLocation: deliveryLocation.address,
         isPickupFromParking: false,
         isDeliveryToParking: false,
         specialNotes: ''

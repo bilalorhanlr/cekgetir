@@ -144,7 +144,7 @@ export default function TopluCekiciModal({ onClose }) {
     musteriTipi: '',
     ad: '',
     soyad: '',
-    tcVatandasi: false,
+    tcVatandasi: true,
     tcKimlik: '',
     firmaAdi: '',
     vergiNo: '',
@@ -292,11 +292,6 @@ export default function TopluCekiciModal({ onClose }) {
   const getKmBasedPrice = (km, kmBasedFees) => {
     // Backend'den gelen KM fiyatlarına göre hesaplama
     const fee = kmBasedFees.find(fee => km >= fee.minKm && km <= fee.maxKm);
-    console.log('🚛 KM Hesaplama Detayları:', {
-      mesafe: km,
-      bulunanFiyat: fee,
-      tumFiyatlar: kmBasedFees
-    });
     return fee ? Number(fee.kmBasiUcret) : 0;
   };
 
@@ -349,93 +344,35 @@ export default function TopluCekiciModal({ onClose }) {
 
   const calculateTotalPrice = async (input) => {
     try {
-      // Önce mesafeyi hesapla
       let km = 0;
       if (input.pickupLocation && input.deliveryLocation) {
         km = await getDistanceBetween(input.pickupLocation, input.deliveryLocation);
       }
 
-      console.log('🚛 Mesafe Hesaplama:', {
-        pickupLocation: input.pickupLocation,
-        deliveryLocation: input.deliveryLocation,
-        hesaplananKm: km
-      });
-
-      console.log('🚛 Fiyat Hesaplama Başlangıç:', {
-        input,
-        sehirFiyatlandirma: input.sehirFiyatlandirma,
-        kmBasedFees,
-        hesaplananKm: km
-      });
-
-      // Base price ve KM fiyatlarını al
       const basePrice = Number(input.sehirFiyatlandirma.basePrice) || 0;
-      
-      // KM bazlı fiyatı hesapla
       const kmBasedPrice = getKmBasedPrice(km, kmBasedFees);
       const totalKmPrice = km * kmBasedPrice;
 
-      console.log('🚛 KM Bazlı Hesaplama:', {
-        basePrice,
-        km,
-        kmBasedPrice,
-        totalKmPrice,
-        kmBasedFees
-      });
-
-      // Segment ve durum katsayılarını bul
       let totalPrice = basePrice + totalKmPrice;
 
-      // Her araç için segment ve durum katsayılarını uygula
       for (const arac of input.araclar) {
         const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
         const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
         
         const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
-        const statusMultiplier = statusObj ? Number(statusObj.price) : 0; // Durum fiyatını ekle olarak kullan
+        const statusMultiplier = statusObj ? Number(statusObj.price) : 0;
 
-        console.log('🚛 Araç Katsayıları:', {
-          arac,
-          segmentMultiplier,
-          statusMultiplier,
-          segmentObj,
-          statusObj
-        });
-
-        // Araç bazlı fiyatı hesapla
         const aracBasePrice = basePrice + totalKmPrice;
-        const aracPrice = (aracBasePrice * segmentMultiplier) + statusMultiplier; // Durum fiyatını ekle olarak kullan
+        const aracPrice = (aracBasePrice * segmentMultiplier) + statusMultiplier;
         totalPrice += aracPrice;
-
-        console.log('🚛 Araç Fiyat Hesaplama:', {
-          aracBasePrice,
-          segmentMultiplier,
-          statusMultiplier,
-          aracPrice
-        });
       }
 
-      // Gece ücreti varsa uygula
       if (input.isNight) {
         totalPrice *= input.nightPriceMultiplier;
-        console.log('🚛 Gece Ücreti Uygulandı:', {
-          nightPriceMultiplier: input.nightPriceMultiplier,
-          totalPriceAfterNight: totalPrice
-        });
       }
-
-      console.log('🚛 Fiyat Hesaplama Sonuç:', {
-        basePrice,
-        totalKmPrice,
-        aracSayisi: input.araclar.length,
-        isNight: input.isNight,
-        nightPriceMultiplier: input.nightPriceMultiplier,
-        totalPrice
-      });
 
       return Math.round(totalPrice);
     } catch (error) {
-      console.error('🚛 Fiyat hesaplama hatası:', error);
       throw error;
     }
   };
@@ -838,16 +775,28 @@ export default function TopluCekiciModal({ onClose }) {
     
     if (step === 1) {
       // Konum kontrolleri
-      if (!pickupLocation) {
+      if (pickupOtopark && !selectedPickupCity) {
+        toast.error('Lütfen alınacak şehri seçin');
+        return;
+      }
+      
+      if (deliveryOtopark && !selectedDeliveryCity) {
+        toast.error('Lütfen teslim edilecek şehri seçin');
+        return;
+      }
+
+      if (!pickupOtopark && !pickupLocation) {
         toast.error('Lütfen alınacak konumu seçin');
         return;
       }
       
-      if (!deliveryLocation) {
+      if (!deliveryOtopark && !deliveryLocation) {
         toast.error('Lütfen teslim edilecek konumu seçin');
         return;
       }
 
+      setStep(2);
+    } else if (step === 2) {
       // Araç kontrolleri
       if (araclar.length === 0) {
         toast.error('Lütfen en az bir araç ekleyin');
@@ -859,15 +808,15 @@ export default function TopluCekiciModal({ onClose }) {
         return;
       }
 
-      setStep(2);
-    } else if (step === 2) {
+      setStep(3);
+    } else if (step === 3) {
       if (!toplamFiyat) {
         toast.error('Lütfen fiyat hesaplamasını bekleyin');
         return;
       }
 
-      setStep(3);
-    } else if (step === 3) {
+      setStep(4);
+    } else if (step === 4) {
       // Müşteri bilgileri kontrolleri
       if (musteriBilgileri.musteriTipi === 'kisisel') {
         if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
@@ -1027,6 +976,48 @@ export default function TopluCekiciModal({ onClose }) {
     }
     setActiveMapPanel(null);
   };
+
+  const FiyatDetaylari = ({ routeInfo, toplamFiyat }) => {
+    return (
+      <div className="space-y-4">
+        <div className="bg-[#202020] rounded-lg p-3">
+          <div className="text-[#404040] text-sm mb-1">Toplam Tutar</div>
+          <div className="text-2xl font-bold text-yellow-500">
+            {toplamFiyat.toLocaleString('tr-TR')} TL
+          </div>
+        </div>
+        {routeInfo && (
+          <>
+            <div className="bg-[#202020] rounded-lg p-3">
+              <div className="text-[#404040] text-sm mb-1">Mesafe</div>
+              <div className="text-white font-medium">{routeInfo.distance}</div>
+            </div>
+            <div className="bg-[#202020] rounded-lg p-3">
+              <div className="text-[#404040] text-sm mb-1">Tahmini Süre</div>
+              <div className="text-white font-medium">{routeInfo.duration}</div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Add useEffect to show route map when both locations are selected
+  useEffect(() => {
+    if (pickupLocation && deliveryLocation) {
+      setActiveMapPanel('route');
+    }
+  }, [pickupLocation, deliveryLocation]);
+
+  useEffect(() => {
+    if (
+      step === 3 &&
+      pickupLocation &&
+      deliveryLocation
+    ) {
+      setActiveMapPanel('route');
+    }
+  }, [step, pickupLocation, deliveryLocation]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-[2px]">

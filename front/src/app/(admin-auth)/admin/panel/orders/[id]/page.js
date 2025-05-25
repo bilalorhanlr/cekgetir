@@ -13,6 +13,7 @@ export default function OrderDetailPage({ params }) {
   const [error, setError] = useState(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false)
+  const [carSegments, setCarSegments] = useState([])
   const orderId = use(params).id
 
   useEffect(() => {
@@ -20,6 +21,14 @@ export default function OrderDetailPage({ params }) {
       fetchOrder()
     }
   }, [orderId])
+
+  useEffect(() => {
+    const fetchCarSegments = async () => {
+      const response = await api.get('api/variables/car-segments')
+      setCarSegments(response.data)
+    }
+    fetchCarSegments()
+  }, [])
 
   const fetchOrder = async () => {
     try {
@@ -551,7 +560,7 @@ export default function OrderDetailPage({ params }) {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <div className="text-gray-400 text-sm mb-1">Segment</div>
-                            <div className="text-white">{vehicle.tip}</div>
+                            <div className="text-white">{carSegments.find(segment => segment.id === parseInt(vehicle.tip))?.name}</div>
                           </div>
                           <div>
                             <div className="text-gray-400 text-sm mb-1">Marka</div>

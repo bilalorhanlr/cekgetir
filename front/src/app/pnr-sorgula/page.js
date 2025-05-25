@@ -30,7 +30,8 @@ export default function PnrSorgula() {
       // Başarılı sorgulamada PNR'ı localStorage'a kaydet
       localStorage.setItem('lastPnr', pnrNumber)
     } catch (err) {
-      setError(err.response?.data?.message || 'Sipariş bulunamadı')
+      // Hata mesajını kullanıcı dostu bir şekilde göster
+      setError('Böyle bir sipariş bulunamadı. Lütfen talep numaranızı kontrol edin.')
       // Hata durumunda localStorage'dan PNR'ı sil
       localStorage.removeItem('lastPnr')
     } finally {
@@ -189,17 +190,13 @@ export default function PnrSorgula() {
                   {/* Sağ Kolon - Araç ve Müşteri Bilgileri */}
                   <div className="flex-1 space-y-6">
                     <div>
-                      <div className="text-[#404040] text-sm mb-2">Araç Bilgileri</div>
+                      <div className="text-[#404040] text-sm mb-3 mt-6">Araç Bilgileri</div>
                       {order.serviceType === 'TOPLU_CEKICI' && order.bulkVehicles ? (
                         <div className="space-y-4">
                           {order.bulkVehicles.map((vehicle, index) => (
                             <div key={vehicle.id} className="bg-[#141414] rounded-xl p-4 border border-[#404040]">
                               <div className="text-yellow-500 font-medium mb-2">Araç {index + 1}</div>
                               <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <div className="text-[#404040] text-sm mb-1">Segment</div>
-                                  <div className="text-white">{vehicle.tip}</div>
-                                </div>
                                 <div>
                                   <div className="text-[#404040] text-sm mb-1">Marka</div>
                                   <div className="text-white">{vehicle.marka}</div>
@@ -216,10 +213,6 @@ export default function PnrSorgula() {
                                   <div className="text-[#404040] text-sm mb-1">Plaka</div>
                                   <div className="text-white font-mono">{vehicle.plaka}</div>
                                 </div>
-                                <div>
-                                  <div className="text-[#404040] text-sm mb-1">Durum</div>
-                                  <div className="text-white">{vehicle.condition}</div>
-                                </div>
                               </div>
                             </div>
                           ))}
@@ -227,10 +220,6 @@ export default function PnrSorgula() {
                       ) : (
                         <div className="bg-[#141414] rounded-xl p-4 border border-[#404040]">
                           <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <div className="text-[#404040] text-sm mb-1">Segment</div>
-                              <div className="text-white">{order.vehicleSegment}</div>
-                            </div>
                             <div>
                               <div className="text-[#404040] text-sm mb-1">Marka</div>
                               <div className="text-white">{order.vehicleBrand}</div>
@@ -247,17 +236,13 @@ export default function PnrSorgula() {
                               <div className="text-[#404040] text-sm mb-1">Plaka</div>
                               <div className="text-white font-mono">{order.vehiclePlate}</div>
                             </div>
-                            <div>
-                              <div className="text-[#404040] text-sm mb-1">Durum</div>
-                              <div className="text-white">{order.vehicleCondition}</div>
-                            </div>
                           </div>
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <div className="text-[#404040] text-sm mb-2">Müşteri Bilgileri</div>
+                      <div className="text-[#404040] text-sm mb-3 mt-8">Müşteri Bilgileri</div>
                       <div className="bg-[#141414] rounded-xl p-4 border border-[#404040]">
                         {order.companyName ? (
                           <>
