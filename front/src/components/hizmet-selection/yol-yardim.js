@@ -72,12 +72,21 @@ export default function YolYardimModal({ onClose }) {
   const [showMap, setShowMap] = useState(null)
   const [searchValue, setSearchValue] = useState('')
   const [location, setLocation] = useState(null)
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [predictions, setPredictions] = useState([])
+  const [autocompleteService, setAutocompleteService] = useState(null)
   const mapRef = useRef(null)
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     libraries
   })
+
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      setAutocompleteService(new window.google.maps.places.AutocompleteService())
+    }
+  }, [isLoaded])
 
   // Fiyat hesaplama fonksiyonu
   const calculatePrice = useCallback(() => {
@@ -357,21 +366,52 @@ export default function YolYardimModal({ onClose }) {
     })
   }
 
-  // Adres arama ile konum seçimi
-  const handlePlaceChanged = async (e) => {
-    const place = e.detail.place
+  // Input değişikliğini handle et
+  const handleInputChange = async (e) => {
+    const value = e.target.value
+    setSearchValue(value)
     
-    if (place && place.geometry) {
-      const newLocation = {
-        lat: place.geometry.location.lat,
-        lng: place.geometry.location.lng,
-        address: place.formatted_address
+    if (value.length > 2 && autocompleteService) {
+      try {
+        const response = await autocompleteService.getPlacePredictions({
+          input: value,
+          componentRestrictions: { country: 'tr' },
+          types: ['address']
+        })
+        setPredictions(response.predictions)
+        setShowAutocomplete(true)
+      } catch (error) {
+        console.error('Autocomplete error:', error)
       }
-      
-      setLocation(newLocation)
-      setSearchValue(place.formatted_address)
-      calculateRoute(newLocation)
-      setShowMap(null)
+    } else {
+      setPredictions([])
+      setShowAutocomplete(false)
+    }
+  }
+
+  // Öneri seçildiğinde
+  const handlePredictionSelect = async (prediction) => {
+    if (window.google) {
+      const geocoder = new window.google.maps.Geocoder()
+      try {
+        const result = await geocoder.geocode({ placeId: prediction.place_id })
+        if (result.results[0]) {
+          const place = result.results[0]
+          const newLocation = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+            address: place.formatted_address
+          }
+          
+          setLocation(newLocation)
+          setSearchValue(place.formatted_address)
+          calculateRoute(newLocation)
+          setShowAutocomplete(false)
+          setPredictions([])
+        }
+      } catch (error) {
+        console.error('Geocoding error:', error)
+      }
     }
   }
 
@@ -410,16 +450,32 @@ export default function YolYardimModal({ onClose }) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          const address = await getAddressFromLatLng(latitude, longitude);
           
-          const newLocation = { lat: latitude, lng: longitude, address };
-          
-          setLocation(newLocation);
-          setSearchValue(address);
-          calculateRoute(newLocation);
-          setShowMap(null);
-          
-          toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+          if (window.google) {
+            const geocoder = new window.google.maps.Geocoder();
+            try {
+              const result = await geocoder.geocode({ location: { lat: latitude, lng: longitude } });
+              if (result.results[0]) {
+                const place = result.results[0];
+                const newLocation = {
+                  lat: latitude,
+                  lng: longitude,
+                  address: place.formatted_address
+                };
+                
+                setLocation(newLocation);
+                setSearchValue(place.formatted_address);
+                calculateRoute(newLocation);
+                setShowAutocomplete(false);
+                setPredictions([]);
+                
+                toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+              }
+            } catch (error) {
+              console.error('Geocoding error:', error);
+              toast.error('Adres bilgisi alınamadı.', { id: 'location' });
+            }
+          }
         },
         (error) => {
           console.error('Geolocation error:', error);
@@ -457,41 +513,44 @@ export default function YolYardimModal({ onClose }) {
     
     if (step === 1) {
       if (!location) {
-        alert('Lütfen bir konum seçin');
+        toast.error('Lütfen bir konum seçin');
         return;
       }
       
-      setStep(2);
+      // Sadece Devam Et butonuna tıklandığında bir sonraki adıma geç
+      if (e.nativeEvent.submitter && e.nativeEvent.submitter.type === 'submit') {
+        setStep(2);
+      }
     } else if (step === 2) {
       if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
-        alert('Lütfen tüm araç bilgilerini doldurun');
+        toast.error('Lütfen tüm araç bilgilerini doldurun');
         return;
       }
 
       if (!selectedAriza) {
-        alert('Lütfen arıza tipini seçin');
+        toast.error('Lütfen arıza tipini seçin');
         return;
       }
 
       setStep(3);
     } else if (step === 3) {
       if (!price) {
-        alert('Lütfen fiyat hesaplamasını bekleyin');
+        toast.error('Lütfen fiyat hesaplamasını bekleyin');
         return;
       }
 
       if (musteriBilgileri.musteriTipi === 'kisisel') {
         if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
           return;
         }
         if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          alert('Lütfen TC Kimlik numaranızı girin');
+          toast.error('Lütfen TC Kimlik numaranızı girin');
           return;
         }
       } else {
         if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          alert('Lütfen tüm zorunlu alanları doldurun');
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
           return;
         }
       }
@@ -583,44 +642,61 @@ export default function YolYardimModal({ onClose }) {
                   <div className="relative">
                     {isLoaded && (
                       <div className="w-full">
-                        <input
-                          type="text"
-                          value={searchValue}
-                          onChange={e => setSearchValue(e.target.value)}
-                          placeholder="Adres girin veya haritadan seçin"
-                          className="w-full pr-16 px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                          onClick={() => setShowMap(true)}
-                        />
-                        <gmp-place-autocomplete
-                          onPlaceChanged={handlePlaceChanged}
-                          placeholder="Adres girin veya haritadan seçin"
-                          style={{ display: 'none' }}
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={searchValue}
+                            onChange={handleInputChange}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            placeholder="Adres girin veya haritadan seçin"
+                            className="w-full pr-16 px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            onClick={() => setShowMap(true)}
+                            onFocus={() => setShowAutocomplete(true)}
+                            onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 bg-[#141414] z-[101]">
+                            <button
+                              type="button"
+                              onClick={handleCurrentLocation}
+                              className="text-[#404040] hover:text-white transition-colors"
+                              title="Mevcut Konumu Kullan"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowMap(!showMap)}
+                              className={`text-[#404040] hover:text-yellow-500 transition-colors ${showMap ? 'text-yellow-500' : ''}`}
+                              title="Haritadan Seç"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h2.28a2 2 0 011.7.95l.94 1.57a2 2 0 001.7.95h5.34a2 2 0 011.7-.95l.94-1.57A2 2 0 0116.72 3H19a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {showAutocomplete && predictions.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#141414] border border-[#404040] rounded-lg shadow-lg z-[100] max-h-[300px] overflow-y-auto">
+                            {predictions.map((prediction) => (
+                              <button
+                                key={prediction.place_id}
+                                onClick={() => handlePredictionSelect(prediction)}
+                                className="w-full text-left px-4 py-3 text-white hover:bg-[#202020] transition-colors border-b border-[#404040] last:border-b-0"
+                              >
+                                {prediction.description}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 bg-[#141414] z-10">
-                      <button
-                        type="button"
-                        onClick={handleCurrentLocation}
-                        className="text-[#404040] hover:text-white transition-colors"
-                        title="Mevcut Konumu Kullan"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowMap(!showMap)}
-                        className={`text-[#404040] hover:text-yellow-500 transition-colors ${showMap ? 'text-yellow-500' : ''}`}
-                        title="Haritadan Seç"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h2.28a2 2 0 011.7.95l.94 1.57a2 2 0 001.7.95h5.34a2 2 0 011.7-.95l.94-1.57A2 2 0 0116.72 3H19a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
-                        </svg>
-                      </button>
-                    </div>
                   </div>
                 </div>
 
