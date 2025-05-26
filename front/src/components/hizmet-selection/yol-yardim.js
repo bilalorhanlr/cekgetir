@@ -78,6 +78,7 @@ export default function YolYardimModal({ onClose }) {
   const [predictions, setPredictions] = useState([])
   const [autocompleteService, setAutocompleteService] = useState(null)
   const mapRef = useRef(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -89,6 +90,9 @@ export default function YolYardimModal({ onClose }) {
       setAutocompleteService(new window.google.maps.places.AutocompleteService())
     }
   }, [isLoaded])
+
+  const currentHour = new Date().getHours();
+  const isNightTime = currentHour >= 22 || currentHour < 8;
 
   // Fiyat hesaplama fonksiyonu
   const calculatePrice = useCallback(() => {
@@ -118,8 +122,6 @@ export default function YolYardimModal({ onClose }) {
     const segmentTotal = baseTotal * segmentMultiplier;
 
     // Gece ücreti kontrolü
-    const currentHour = new Date().getHours();
-    const isNightTime = currentHour >= 22 || currentHour < 8;
     const finalPrice = isNightTime ? segmentTotal * nightPrice : segmentTotal;
 
     console.log('Fiyat Hesaplama Detayları:', {
@@ -185,16 +187,20 @@ export default function YolYardimModal({ onClose }) {
     );
   };
 
-  // Fiyat detaylarını göster
-  const currentHour = new Date().getHours();
-
   // Fiyat teklifi bölümünü güncelle
   const renderPriceOffer = () => (
     <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-white">Fiyat Teklifi</h3>
-        <div className="text-3xl font-bold text-yellow-500">
-          {price?.toLocaleString('tr-TR')} TL
+        <div className="flex items-center gap-2">
+          {isNightTime && (
+            <div className="text-[10px] text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded max-w-[180px]">
+              Gece Tarifesi (22:00 - 08:00) • Gündüz daha uygun
+            </div>
+          )}
+          <div className="text-3xl font-bold text-yellow-500">
+            {price?.toLocaleString('tr-TR')} TL
+          </div>
         </div>
       </div>
       {renderPriceDetails()}
@@ -583,53 +589,58 @@ export default function YolYardimModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (step === 1) {
-      // Konum kontrolü
-      if (!location) {
-        toast.error('Lütfen konum seçin');
-        return;
-      }
-
-      // Arıza kontrolü
-      if (!selectedAriza) {
-        toast.error('Lütfen arıza türünü seçin');
-        return;
-      }
-
-      // Araç bilgileri kontrolü
-      if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
-        toast.error('Lütfen tüm araç bilgilerini doldurun');
-        return;
-      }
-
-      setStep(2);
-    } else if (step === 2) {
-      // Fiyat kontrolü
-      if (!price) {
-        toast.error('Lütfen fiyat hesaplamasını bekleyin');
-        return;
-      }
-      setStep(3);
-    } else if (step === 3) {
-      // Müşteri bilgileri kontrolü
-      if (musteriBilgileri.musteriTipi === 'kisisel') {
-        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm zorunlu alanları doldurun');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (step === 1) {
+        // Konum kontrolü
+        if (!location) {
+          toast.error('Lütfen konum seçin');
           return;
         }
-        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          toast.error('Lütfen TC Kimlik numaranızı girin');
-          return;
-        }
-      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
-        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
-          return;
-        }
-      }
 
-      await createOrder();
+        // Arıza kontrolü
+        if (!selectedAriza) {
+          toast.error('Lütfen arıza türünü seçin');
+          return;
+        }
+
+        // Araç bilgileri kontrolü
+        if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
+          toast.error('Lütfen tüm araç bilgilerini doldurun');
+          return;
+        }
+
+        setStep(2);
+      } else if (step === 2) {
+        // Fiyat kontrolü
+        if (!price) {
+          toast.error('Lütfen fiyat hesaplamasını bekleyin');
+          return;
+        }
+        setStep(3);
+      } else if (step === 3) {
+        // Müşteri bilgileri kontrolü
+        if (musteriBilgileri.musteriTipi === 'kisisel') {
+          if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm zorunlu alanları doldurun');
+            return;
+          }
+          if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+            toast.error('Lütfen TC Kimlik numaranızı girin');
+            return;
+          }
+        } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
+          if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
+            return;
+          }
+        }
+
+        await createOrder();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -637,7 +648,6 @@ export default function YolYardimModal({ onClose }) {
     try {
       const orderData = {
         serviceType: 'YOL_YARDIM',
-        faultType: selectedAriza?.id,
         breakdownLocation: location?.address,
         breakdownDescription: selectedAriza?.title,
         destinationLocation: location?.address,
@@ -903,10 +913,10 @@ export default function YolYardimModal({ onClose }) {
 
               <button
                 type="submit"
-                disabled={!location || !selectedAriza || !aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip}
+                disabled={isSubmitting || !location || !selectedAriza || !aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip}
                 className="w-full py-3 px-6 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Devam Et
+                {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
               </button>
             </form>
           ) : step === 2 ? (
@@ -978,8 +988,9 @@ export default function YolYardimModal({ onClose }) {
                 <button
                   type="submit"
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={isSubmitting}
                 >
-                  İlerle
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'İlerle'}
                 </button>
               </div>
             </form>
@@ -1185,8 +1196,11 @@ export default function YolYardimModal({ onClose }) {
                 <button
                   type="submit"
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={isSubmitting || (musteriBilgileri.musteriTipi === 'kisisel'
+                    ? (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email || (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik))
+                    : (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email))}
                 >
-                  Siparişi Tamamla
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
               </div>
             </form>

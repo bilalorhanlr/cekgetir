@@ -17,8 +17,51 @@ export default function OrdersPage() {
   
 
   useEffect(() => {
+    // Token kontrolü
+    const adminToken = localStorage.getItem('adminToken')
+    const tokenExpiry = localStorage.getItem('tokenExpiry')
+    
+    if (!adminToken) {
+      router.push('/admin/login')
+      return
+    }
+
+    // Token süresi dolmuşsa çıkış yap
+    if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('tokenExpiry')
+      router.push('/admin/login')
+      return
+    }
+
+    // Token süresi dolmak üzereyse yenile
+    if (tokenExpiry && Date.now() > parseInt(tokenExpiry) - 5 * 60 * 1000) { // 5 dakika kala
+      refreshToken(adminToken)
+    }
+
     fetchOrders()
-  }, [])
+  }, [router])
+
+  const refreshToken = async (token) => {
+    try {
+      const response = await api.post('/api/auth/refresh', null, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (response.data.success) {
+        const { access_token, expires_in } = response.data
+        localStorage.setItem('adminToken', access_token)
+        localStorage.setItem('tokenExpiry', (Date.now() + expires_in * 1000).toString())
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('tokenExpiry')
+      router.push('/admin/login')
+    }
+  }
 
   const fetchOrders = async () => {
     try {
@@ -86,7 +129,7 @@ export default function OrdersPage() {
     const matchesSearch = 
       order.pnrNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${order.customerName} ${order.customerSurname}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerPhone.includes(searchTerm) ||
+      order.customerPhone.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.vehiclePlate.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter

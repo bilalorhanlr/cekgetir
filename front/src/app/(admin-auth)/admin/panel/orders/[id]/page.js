@@ -18,10 +18,53 @@ export default function OrderDetailPage({ params }) {
   const orderId = use(params).id
 
   useEffect(() => {
+    // Token kontrolü
+    const adminToken = localStorage.getItem('adminToken')
+    const tokenExpiry = localStorage.getItem('tokenExpiry')
+    
+    if (!adminToken) {
+      router.push('/admin/login')
+      return
+    }
+
+    // Token süresi dolmuşsa çıkış yap
+    if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('tokenExpiry')
+      router.push('/admin/login')
+      return
+    }
+
+    // Token süresi dolmak üzereyse yenile
+    if (tokenExpiry && Date.now() > parseInt(tokenExpiry) - 5 * 60 * 1000) { // 5 dakika kala
+      refreshToken(adminToken)
+    }
+
     if (orderId) {
       fetchOrder()
     }
-  }, [orderId])
+  }, [orderId, router])
+
+  const refreshToken = async (token) => {
+    try {
+      const response = await api.post('/api/auth/refresh', null, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (response.data.success) {
+        const { access_token, expires_in } = response.data
+        localStorage.setItem('adminToken', access_token)
+        localStorage.setItem('tokenExpiry', (Date.now() + expires_in * 1000).toString())
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('tokenExpiry')
+      router.push('/admin/login')
+    }
+  }
 
   useEffect(() => {
     fetchCarSegments()
@@ -173,14 +216,8 @@ export default function OrderDetailPage({ params }) {
               </div>
               <div>
                 <div className="text-gray-400 text-sm mb-1">Araç Sayısı</div>
-                <div className="text-white text-lg">{order.numberOfVehicles || '1'}</div>
+                <div className="text-white text-lg">{order.bulkVehicles.length}</div>
               </div>
-              {order.specialNotes && (
-                <div>
-                  <div className="text-gray-400 text-sm mb-1">Özel Notlar</div>
-                  <div className="text-white text-lg">{order.specialNotes}</div>
-                </div>
-              )}
             </div>
           </div>
         )

@@ -9,10 +9,25 @@ import api from '@/utils/axios'
 export default function AdminLoginPage() {
   const router = useRouter()
   
-  // Token kontrolü için useEffect
+  // Token kontrolü ve yenileme için useEffect
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken')
+    const tokenExpiry = localStorage.getItem('tokenExpiry')
+    
     if (adminToken) {
+      // Token süresi dolmuşsa çıkış yap
+      if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
+        localStorage.removeItem('adminToken')
+        localStorage.removeItem('tokenExpiry')
+        router.push('/admin/login')
+        return
+      }
+
+      // Token süresi dolmak üzereyse yenile
+      if (tokenExpiry && Date.now() > parseInt(tokenExpiry) - 5 * 60 * 1000) { // 5 dakika kala
+        refreshToken(adminToken)
+      }
+
       router.push('/admin/panel/orders')
     }
   }, [router])
@@ -23,6 +38,27 @@ export default function AdminLoginPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const refreshToken = async (token) => {
+    try {
+      const response = await api.post('/api/auth/refresh', null, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (response.data.success) {
+        const { access_token, expires_in } = response.data
+        localStorage.setItem('adminToken', access_token)
+        localStorage.setItem('tokenExpiry', (Date.now() + expires_in * 1000).toString())
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('tokenExpiry')
+      router.push('/admin/login')
+    }
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -35,28 +71,21 @@ export default function AdminLoginPage() {
 
     try {
       setIsLoading(true)
-      console.log('Login attempt with:', formData)
       
       const response = await api.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
       })
 
-      console.log('Login response:', response.data)
-
       if (response.data.success) {
-        const { access_token } = response.data
+        const { access_token, expires_in } = response.data
         localStorage.setItem('adminToken', access_token)
+        localStorage.setItem('tokenExpiry', (Date.now() + expires_in * 1000).toString())
         router.push('/admin/panel/orders')
       }
       
     } catch (err) {
       console.error('Login Error:', err)
-      console.error('Error details:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
-      })
       setError(err.response?.data?.message || 'Giriş bilgileri hatalı')
     } finally {
       setIsLoading(false)

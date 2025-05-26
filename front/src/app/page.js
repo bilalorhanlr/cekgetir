@@ -7,6 +7,7 @@ import { useState } from 'react'
 import YolYardimModal from '@/components/hizmet-selection/yol-yardim'
 import OzelCekiciModal from '@/components/hizmet-selection/ozel-cekici'
 import SehirlerArasiModal from '@/components/hizmet-selection/sehirler-arasi'
+import CookieConsent from '@/components/CookieConsent'
 
 export default function Home() {
   const [activeModal, setActiveModal] = useState(null)
@@ -21,9 +22,7 @@ export default function Home() {
       title: 'Şehirler Arası',
       description: 'Şehirler arası araç transferi',
       icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
+        <svg className="w-8 h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path fill="currentColor" d="M224 96.8V96a56.06 56.06 0 0 0-56-56h-8a16 16 0 0 0-16 16v120h-16V72a8 8 0 0 0-8-8H16A16 16 0 0 0 0 80v104a32 32 0 0 0 56 21.13A32 32 0 0 0 111 192h82a32 32 0 0 0 63-8v-48a40.07 40.07 0 0 0-32-39.2M160 56h8a40 40 0 0 1 40 40v8a8 8 0 0 0 8 8a24 24 0 0 1 24 24v20.31a31.71 31.71 0 0 0-16-4.31a32.06 32.06 0 0 0-31 24h-33Zm-48 24v96h-1a32 32 0 0 0-55-13.13a31.9 31.9 0 0 0-40-6.56V80ZM32 200a16 16 0 1 1 16-16a16 16 0 0 1-16 16m48 0a16 16 0 1 1 16-16a16 16 0 0 1-16 16m144 0a16 16 0 1 1 16-16a16 16 0 0 1-16 16"/></svg>
       )
     },
     {
@@ -31,9 +30,7 @@ export default function Home() {
       title: 'Çekici Hizmeti',
       description: 'Araç çekme ve taşıma hizmetleri',
       icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
+        <svg className="w-8 h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M15 10h5.39l-3.33-4H15v4m2.5 8.5c.39 0 .74-.13 1.04-.43c.3-.3.46-.65.46-1.07c0-.39-.16-.74-.46-1.04c-.3-.3-.65-.46-1.04-.46c-.42 0-.77.16-1.07.46c-.3.3-.43.65-.43 1.04c0 .42.13.77.43 1.07c.3.3.65.43 1.07.43M6 18.5c.44 0 .8-.13 1.08-.43s.42-.65.42-1.07c0-.39-.14-.74-.42-1.04c-.28-.3-.64-.46-1.08-.46c-.44 0-.8.16-1.08.46c-.28.3-.42.65-.42 1.04c0 .42.14.77.42 1.07c.28.3.64.43 1.08.43M18 4l5 6v7h-2.5c0 .83-.31 1.53-.91 2.13c-.59.59-1.29.87-2.09.87c-.83 0-1.53-.28-2.12-.87c-.6-.6-.88-1.3-.88-2.13H9c0 .83-.3 1.53-.89 2.13c-.61.59-1.3.87-2.11.87c-.81 0-1.5-.28-2.11-.87C3.3 18.53 3 17.83 3 17H1v-4h8.19L3 8.11V11H1V5h1l11 6.06V4h5Z"/></svg>
       )
     },
     {
@@ -41,9 +38,7 @@ export default function Home() {
       title: 'Yol Yardım',
       description: 'Akü takviyesi, lastik değişimi vs.',
       icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
+        <svg className="w-8 h-8"  xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="2"/><path strokeLinecap="round" d="M6 12h4m4 0h4m-9 5.196l2-3.464m2-3.464l2-3.464m0 10.392l-2-3.464m-2-3.464L9 6.804M7 3.338A9.954 9.954 0 0 1 12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12c0-1.821.487-3.53 1.338-5"/><path strokeLinecap="round" d="M15 17.197A6 6 0 1 1 17.197 15"/></g></svg>
       )
     }
     
@@ -55,6 +50,7 @@ export default function Home() {
         <Navbar />
       </div>
       <main className="min-h-screen bg-white ">
+        <CookieConsent />
         {/* Hero Section */}
         <section className="relative min-h-[100vh] flex items-center">
           <div className="absolute inset-0 z-0">

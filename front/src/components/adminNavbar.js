@@ -11,6 +11,7 @@ export default function AdminNavbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken')
+    localStorage.removeItem('tokenExpiry')
     router.push('/admin/login')
   }
 

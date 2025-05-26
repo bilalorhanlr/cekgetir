@@ -45,9 +45,6 @@ export class Order {
   @Column({ type: 'enum', enum: ['YOL_YARDIM', 'OZEL_CEKICI', 'TOPLU_CEKICI'], default: 'YOL_YARDIM' })
   serviceType: 'YOL_YARDIM' | 'OZEL_CEKICI' | 'TOPLU_CEKICI';
 
-  @Column({ nullable: true })
-  faultType: string;
-
   // Yol Yardım için konum bilgileri
   @Column({ nullable: true })
   breakdownLocation: string;
@@ -71,9 +68,6 @@ export class Order {
   @Column({ type: 'boolean', default: false })
   isDeliveryToParking: boolean;
 
-  @Column({ nullable: true })
-  specialNotes: string;
-
   // Araç Bilgileri
   @Column({ nullable: true })
   vehicleSegment: string;
@@ -93,9 +87,6 @@ export class Order {
   @Column({ nullable: true })
   vehicleCondition: string;
 
-  @Column({ type: 'int', default: 1 })
-  numberOfVehicles: number;
-
   @OneToMany(() => BulkVehicle, bulkVehicle => bulkVehicle.order)
   bulkVehicles: BulkVehicle[];
 
@@ -107,9 +98,6 @@ export class Order {
 
   @Column({ type: 'enum', enum: ['ODEME_BEKLIYOR', 'ODENDI', 'IPTAL_EDILDI', 'IADE_EDILDI'], default: 'ODEME_BEKLIYOR' })
   paymentStatus: 'ODEME_BEKLIYOR' | 'ODENDI' | 'IPTAL_EDILDI' | 'IADE_EDILDI';
-
-  @Column({ nullable: true })
-  assignedDriverId: string;
 
   @CreateDateColumn()
   createdAt: Date;

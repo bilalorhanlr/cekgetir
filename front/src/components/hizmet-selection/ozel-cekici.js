@@ -82,6 +82,7 @@ export default function OzelCekiciModal({ onClose }) {
   const [error, setError] = useState(null)
   const [sehirFiyatlandirma, setSehirFiyatlandirma] = useState(null)
   const mapRef = useRef(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -544,51 +545,56 @@ export default function OzelCekiciModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (step === 1) {
-      // Konum kontrolleri
-      if (!pickupLocation) {
-        toast.error('Lütfen alınacak konumu seçin');
-        return;
-      }
-      
-      if (!deliveryLocation) {
-        toast.error('Lütfen teslim edilecek konumu seçin');
-        return;
-      }
-
-      // Araç bilgileri kontrolleri
-      if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
-        toast.error('Lütfen tüm araç bilgilerini doldurun');
-        return;
-      }
-
-      setStep(2);
-    } else if (step === 2) {
-      if (!price) {
-        toast.error('Lütfen fiyat hesaplamasını bekleyin');
-        return;
-      }
-      setStep(3);
-    } else if (step === 3) {
-      // Müşteri bilgileri kontrolleri
-      if (musteriBilgileri.musteriTipi === 'kisisel') {
-        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm zorunlu alanları doldurun');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (step === 1) {
+        // Konum kontrolleri
+        if (!pickupLocation) {
+          toast.error('Lütfen alınacak konumu seçin');
           return;
         }
-        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          toast.error('Lütfen TC Kimlik numaranızı girin');
+        
+        if (!deliveryLocation) {
+          toast.error('Lütfen teslim edilecek konumu seçin');
           return;
         }
-      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
-        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
-          return;
-        }
-      }
 
-      await createOrder();
+        // Araç bilgileri kontrolleri
+        if (!aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip) {
+          toast.error('Lütfen tüm araç bilgilerini doldurun');
+          return;
+        }
+
+        setStep(2);
+      } else if (step === 2) {
+        if (!price) {
+          toast.error('Lütfen fiyat hesaplamasını bekleyin');
+          return;
+        }
+        setStep(3);
+      } else if (step === 3) {
+        // Müşteri bilgileri kontrolleri
+        if (musteriBilgileri.musteriTipi === 'kisisel') {
+          if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm zorunlu alanları doldurun');
+            return;
+          }
+          if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+            toast.error('Lütfen TC Kimlik numaranızı girin');
+            return;
+          }
+        } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
+          if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
+            return;
+          }
+        }
+
+        await createOrder();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -637,8 +643,7 @@ export default function OzelCekiciModal({ onClose }) {
         pickupLocation: pickupLocation.address,
         deliveryLocation: deliveryLocation.address,
         isPickupFromParking: false,
-        isDeliveryToParking: false,
-        specialNotes: ''
+        isDeliveryToParking: false
       };
 
       console.log('Gönderilen veri:', orderData);
@@ -952,104 +957,116 @@ export default function OzelCekiciModal({ onClose }) {
 
               <button
                 type="submit"
-                disabled={!pickupLocation || !deliveryLocation || !aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip}
+                disabled={isSubmitting || !pickupLocation || !deliveryLocation || !aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip}
                 className="w-full py-3 px-6 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Devam Et
+                {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
               </button>
             </form>
           ) : step === 2 ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Fiyat Teklifi */}
-                <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-white">Fiyat Teklifi</h3>
-                    <div className="text-3xl font-bold text-yellow-500">
-                      {price?.toLocaleString('tr-TR')} TL
-                    </div>
-                  </div>
-                  <div className="block text-sm">
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Araç</div>
-                      <div className="text-white font-medium truncate" title={`${aracBilgileri.marka} ${aracBilgileri.model} (${aracBilgileri.yil})`}>
-                        {aracBilgileri.marka} {aracBilgileri.model} ({aracBilgileri.yil})
+              {(() => {
+                const currentHour = new Date().getHours();
+                const isNightTime = (currentHour >= 22 || currentHour < 8);
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Fiyat Teklifi */}
+                    <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-white">Fiyat Teklifi</h3>
+                        <div className="flex items-center gap-2">
+                          {isNightTime && (
+                            <div className="text-[10px] text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded max-w-[180px]">
+                              Gece Tarifesi (22:00 - 08:00) • Gündüz daha uygun
+                            </div>
+                          )}
+                          <div className="text-3xl font-bold text-yellow-500">
+                            {price?.toLocaleString('tr-TR')} TL
+                          </div>
+                        </div>
+                      </div>
+                      <div className="block text-sm">
+                        <div className="bg-[#202020] rounded-lg p-2 mb-3">
+                          <div className="text-[#404040]">Araç</div>
+                          <div className="text-white font-medium truncate" title={`${aracBilgileri.marka} ${aracBilgileri.model} (${aracBilgileri.yil})`}>
+                            {aracBilgileri.marka} {aracBilgileri.model} ({aracBilgileri.yil})
+                          </div>
+                        </div>
+                        <div className="bg-[#202020] rounded-lg p-2 mb-3">
+                          <div className="text-[#404040]">Plaka</div>
+                          <div className="text-white font-medium">{aracBilgileri.plaka}</div>
+                        </div>
+                        <div className="bg-[#202020] rounded-lg p-2 mb-3">
+                          <div className="text-[#404040]">Alınacak Konum</div>
+                          <div className="text-white font-medium text-xs" title={pickupLocation?.address}>
+                            {pickupLocation?.address}
+                          </div>
+                        </div>
+                        <div className="bg-[#202020] rounded-lg p-2 text-center">
+                          <div className="text-[#404040] text-xs">Teslim Edilecek Konum</div>
+                          <div className="text-white font-medium text-xs" title={deliveryLocation?.address}>
+                            {deliveryLocation?.address}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Plaka</div>
-                      <div className="text-white font-medium">{aracBilgileri.plaka}</div>
-                    </div>
-                    <div className="bg-[#202020] rounded-lg p-2 mb-3">
-                      <div className="text-[#404040]">Alınacak Konum</div>
-                      <div className="text-white font-medium text-xs" title={pickupLocation?.address}>
-                        {pickupLocation?.address}
-                      </div>
-                    </div>
-                    <div className="bg-[#202020] rounded-lg p-2 text-center">
-                      <div className="text-[#404040] text-xs">Teslim Edilecek Konum</div>
-                      <div className="text-white font-medium text-xs" title={deliveryLocation?.address}>
-                        {deliveryLocation?.address}
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Rota ve Harita */}
-                <div className="bg-[#141414] rounded-lg border border-[#404040] overflow-hidden">
-                  <div className="p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-semibold text-white">Rota Bilgileri</h3>
-                      <button
-                        type="button"
-                        onClick={() => setActiveMapPanel(activeMapPanel === 'route' ? null : 'route')}
-                        className="text-yellow-500 hover:text-yellow-400 transition-colors text-sm flex items-center gap-1 bg-[#202020] px-3 py-1.5 rounded-lg"
-                      >
-                        {activeMapPanel === 'route' ? 'Haritayı Kapat' : 'Haritayı Göster'}
-                      </button>
-                    </div>
-                    {routeInfo && (
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div className="bg-[#202020] rounded-lg p-2 text-center">
-                          <div className="text-[#404040] text-xs">Mesafe</div>
-                          <div className="text-white font-medium text-sm">{routeInfo.distance.toFixed(1)} km</div>
+                    {/* Rota ve Harita */}
+                    <div className="bg-[#141414] rounded-lg border border-[#404040] overflow-hidden">
+                      <div className="p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="text-lg font-semibold text-white">Rota Bilgileri</h3>
+                          <button
+                            type="button"
+                            onClick={() => setActiveMapPanel(activeMapPanel === 'route' ? null : 'route')}
+                            className="text-yellow-500 hover:text-yellow-400 transition-colors text-sm flex items-center gap-1 bg-[#202020] px-3 py-1.5 rounded-lg"
+                          >
+                            {activeMapPanel === 'route' ? 'Haritayı Kapat' : 'Haritayı Göster'}
+                          </button>
                         </div>
-                        <div className="bg-[#202020] rounded-lg p-2 text-center">
-                          <div className="text-[#404040] text-xs">Süre</div>
-                          <div className="text-white font-medium text-sm">{Math.round(routeInfo.duration)} dk</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {activeMapPanel === 'route' && isLoaded && (
-                    <div style={{ height: '200px' }}>
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={pickupLocation || { lat: 41.0082, lng: 28.9784 }}
-                        zoom={13}
-                        options={mapOptions}
-                      >
-                        {pickupLocation && <Marker position={pickupLocation} clickable={false} />}
-                        {deliveryLocation && <Marker position={deliveryLocation} clickable={false} />}
-                        {directions && (
-                          <DirectionsRenderer
-                            directions={directions}
-                            options={{
-                              suppressMarkers: true,
-                              polylineOptions: {
-                                strokeColor: '#EAB308',
-                                strokeWeight: 5,
-                                strokeOpacity: 0.8
-                              }
-                            }}
-                          />
+                        {routeInfo && (
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div className="bg-[#202020] rounded-lg p-2 text-center">
+                              <div className="text-[#404040] text-xs">Mesafe</div>
+                              <div className="text-white font-medium text-sm">{routeInfo.distance.toFixed(1)} km</div>
+                            </div>
+                            <div className="bg-[#202020] rounded-lg p-2 text-center">
+                              <div className="text-[#404040] text-xs">Süre</div>
+                              <div className="text-white font-medium text-sm">{Math.round(routeInfo.duration)} dk</div>
+                            </div>
+                          </div>
                         )}
-                      </GoogleMap>
+                      </div>
+                      {activeMapPanel === 'route' && isLoaded && (
+                        <div style={{ height: '200px' }}>
+                          <GoogleMap
+                            mapContainerStyle={{ width: '100%', height: '100%' }}
+                            center={pickupLocation || { lat: 41.0082, lng: 28.9784 }}
+                            zoom={13}
+                            options={mapOptions}
+                          >
+                            {pickupLocation && <Marker position={pickupLocation} clickable={false} />}
+                            {deliveryLocation && <Marker position={deliveryLocation} clickable={false} />}
+                            {directions && (
+                              <DirectionsRenderer
+                                directions={directions}
+                                options={{
+                                  suppressMarkers: true,
+                                  polylineOptions: {
+                                    strokeColor: '#EAB308',
+                                    strokeWeight: 5,
+                                    strokeOpacity: 0.8
+                                  }
+                                }}
+                              />
+                            )}
+                          </GoogleMap>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-
+                  </div>
+                );
+              })()}
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1061,9 +1078,20 @@ export default function OzelCekiciModal({ onClose }) {
                 <button
                   type="submit"
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={isSubmitting}
                 >
-                  İlerle
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
+              </div>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[#404040]">
+                  Siparişi Onayla butonuna tıkladığınızda{' '}
+                  <a href="/kvkk" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">KVKK</a>,{' '}
+                  <a href="/acik-riza" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Açık Rıza Metni</a>,{' '}
+                  <a href="/aydinlatma" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Aydınlatma Metni</a> ve{' '}
+                  <a href="/sorumluluk-reddi" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Sorumluluk Reddi Beyanı</a> metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
+                </p>
               </div>
             </form>
           ) : step === 3 ? (
@@ -1267,14 +1295,10 @@ export default function OzelCekiciModal({ onClose }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    musteriBilgileri.musteriTipi === 'kisisel'
-                      ? (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email || (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik))
-                      : (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email)
-                  }
-                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={isSubmitting}
                 >
-                  İlerle
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'İlerle'}
                 </button>
               </div>
             </form>

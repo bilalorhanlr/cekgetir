@@ -20,18 +20,18 @@ export class OrderService {
 
   private generatePNR(): string {
     // 6 karakterli benzersiz PNR oluştur (harf ve rakam kombinasyonu)
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let pnr = '';
     for (let i = 0; i < 6; i++) {
       pnr += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    console.log('Generated PNR:', pnr);
+    console.log('Generated Talep No:', pnr);
     return pnr;
   }
 
   async create(orderData: any): Promise<Order> {
     const pnr = this.generatePNR();
-    console.log('Creating order with PNR:', pnr);
+    console.log('Creating order with Talep No:', pnr);
     console.log('Order data received:', JSON.stringify(orderData, null, 2));
     console.log('Vehicle condition:', orderData.vehicles);
     // Ana sipariş verilerini oluştur
@@ -55,7 +55,6 @@ export class OrderService {
       dropoffLocation: orderData.serviceType !== 'YOL_YARDIM' ? orderData.dropoffLocation : null,
       isPickupFromParking: orderData.isPickupFromParking || false,
       isDeliveryToParking: orderData.isDeliveryToParking || false,
-      specialNotes: orderData.specialNotes || '',
       vehicleSegment: orderData.vehicles?.[0]?.tip || '',
       vehicleBrand: orderData.vehicles?.[0]?.marka || '',
       vehicleModel: orderData.vehicles?.[0]?.model || '',
@@ -64,8 +63,7 @@ export class OrderService {
       price: orderData.price || 0,
       vehicleCondition: orderData.vehicles?.[0]?.condition || '',
       status: 'ONAY_BEKLIYOR',
-      paymentStatus: 'ODEME_BEKLIYOR',
-      faultType: orderData.faultType || ''
+      paymentStatus: 'ODEME_BEKLIYOR'
     });
 
     console.log('Created order object:', order);

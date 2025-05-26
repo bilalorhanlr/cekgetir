@@ -39,6 +39,7 @@ export default function SehirlerArasiModal({ onClose }) {
   const [activeMapPanel, setActiveMapPanel] = useState(null)
   const [pickupSearchValue, setPickupSearchValue] = useState('')
   const [deliverySearchValue, setDeliverySearchValue] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -113,7 +114,6 @@ export default function SehirlerArasiModal({ onClose }) {
         dropoffLocation: deliveryLocation.address,
         isPickupFromParking: pickupOtopark ? true : false,
         isDeliveryToParking: deliveryOtopark ? true : false,
-        specialNotes: ''
       };
 
       console.log('Gönderilen veri:', orderData);
@@ -140,70 +140,69 @@ export default function SehirlerArasiModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (step === 1) {
-      if (!selectedService) {
-        toast.error('Lütfen bir hizmet seçin');
-        return;
-      }
-
-      if (selectedService === 'ozel') {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (step === 1) {
+        if (!selectedService) {
+          toast.error('Lütfen bir hizmet seçin');
+          return;
+        }
         setStep(2);
         return;
-      } else if (selectedService === 'toplu') {
-        setStep(2);
-        return;
-      }
-    } else if (step === 2) {
-      // Konum kontrolleri
-      if (!pickupLocation) {
-        toast.error('Lütfen alınacak konumu seçin');
-        return;
-      }
-      
-      if (!deliveryLocation) {
-        toast.error('Lütfen teslim edilecek konumu seçin');
-        return;
-      }
-
-      // Araç kontrolleri
-      if (araclar.length === 0) {
-        toast.error('Lütfen en az bir araç ekleyin');
-        return;
-      }
-
-      if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment)) {
-        toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
-        return;
-      }
-
-      setStep(3);
-    } else if (step === 3) {
-      if (!toplamFiyat) {
-        toast.error('Lütfen fiyat hesaplamasını bekleyin');
-        return;
-      }
-
-      setStep(4);
-    } else if (step === 4) {
-      // Müşteri bilgileri kontrolleri
-      if (musteriBilgileri.musteriTipi === 'kisisel') {
-        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm zorunlu alanları doldurun');
+      } else if (step === 2) {
+        // Konum kontrolleri
+        if (!pickupLocation) {
+          toast.error('Lütfen alınacak konumu seçin');
           return;
         }
-        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-          toast.error('Lütfen TC Kimlik numaranızı girin');
+        
+        if (!deliveryLocation) {
+          toast.error('Lütfen teslim edilecek konumu seçin');
           return;
         }
-      } else {
-        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-          toast.error('Lütfen tüm zorunlu alanları doldurun');
-          return;
-        }
-      }
 
-      await createOrder();
+        // Araç kontrolleri
+        if (araclar.length === 0) {
+          toast.error('Lütfen en az bir araç ekleyin');
+          return;
+        }
+
+        if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment)) {
+          toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
+          return;
+        }
+
+        setStep(3);
+      } else if (step === 3) {
+        if (!toplamFiyat) {
+          toast.error('Lütfen fiyat hesaplamasını bekleyin');
+          return;
+        }
+
+        setStep(4);
+      } else if (step === 4) {
+        // Müşteri bilgileri kontrolleri
+        if (musteriBilgileri.musteriTipi === 'kisisel') {
+          if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm zorunlu alanları doldurun');
+            return;
+          }
+          if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+            toast.error('Lütfen TC Kimlik numaranızı girin');
+            return;
+          }
+        } else {
+          if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+            toast.error('Lütfen tüm zorunlu alanları doldurun');
+            return;
+          }
+        }
+
+        await createOrder();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -504,11 +503,17 @@ export default function SehirlerArasiModal({ onClose }) {
 
               <button
                 type="submit"
-                disabled={!selectedService}
+                disabled={isSubmitting || !selectedService}
                 className="w-full py-3 px-6 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Devam Et
+                {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
               </button>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[#404040]">
+                  Siparişi Onayla butonuna tıkladığınızda KVKK, Açık Rıza Metni, Aydınlatma Metni ve Sorumluluk Reddi Beyanı metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
+                </p>
+              </div>
             </form>
           ) : step === 2 ? (
             selectedService === 'ozel' ? (
@@ -526,9 +531,10 @@ export default function SehirlerArasiModal({ onClose }) {
                   onClose();
                   window.location.href = `/pnr-sorgula?pnr=${pnrNumber}`;
                 }}
-                className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                disabled={isSubmitting}
+                className="px-6 py-3 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Tamam
+                {isSubmitting ? 'Lütfen Bekleyin...' : 'Tamam'}
               </button>
             </div>
           )}
