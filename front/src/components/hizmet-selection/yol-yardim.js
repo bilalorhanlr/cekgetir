@@ -913,11 +913,12 @@ export default function YolYardimModal({ onClose }) {
 
               <button
                 type="submit"
-                disabled={isSubmitting || !location || !selectedAriza || !aracBilgileri.marka || !aracBilgileri.model || !aracBilgileri.yil || !aracBilgileri.plaka || !aracBilgileri.tip}
+                disabled={isSubmitting || !location || !selectedAriza}
                 className="w-full py-3 px-6 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
               </button>
+
             </form>
           ) : step === 2 ? (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -990,7 +991,7 @@ export default function YolYardimModal({ onClose }) {
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'İlerle'}
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
               </div>
             </form>
@@ -1202,6 +1203,15 @@ export default function YolYardimModal({ onClose }) {
                 >
                   {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[#404040]">
+                  Devam Et butonuna tıkladığınızda{' '}
+                  <a href="/kvkk" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">KVKK</a>,{' '}
+                  <a href="/acik-riza" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Açık Rıza Metni</a>,{' '}
+                  <a href="/aydinlatma" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Aydınlatma Metni</a> ve{' '}
+                  <a href="/sorumluluk-reddi" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Sorumluluk Reddi Beyanı</a> metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
+                </p>
               </div>
             </form>
           ) : (

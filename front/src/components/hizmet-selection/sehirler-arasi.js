@@ -508,12 +508,6 @@ export default function SehirlerArasiModal({ onClose }) {
               >
                 {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
               </button>
-
-              <div className="mt-4 text-center">
-                <p className="text-xs text-[#404040]">
-                  Siparişi Onayla butonuna tıkladığınızda KVKK, Açık Rıza Metni, Aydınlatma Metni ve Sorumluluk Reddi Beyanı metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
-                </p>
-              </div>
             </form>
           ) : step === 2 ? (
             selectedService === 'ozel' ? (

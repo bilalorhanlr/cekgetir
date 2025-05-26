@@ -1080,18 +1080,8 @@ export default function OzelCekiciModal({ onClose }) {
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
                 </button>
-              </div>
-
-              <div className="mt-4 text-center">
-                <p className="text-xs text-[#404040]">
-                  Siparişi Onayla butonuna tıkladığınızda{' '}
-                  <a href="/kvkk" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">KVKK</a>,{' '}
-                  <a href="/acik-riza" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Açık Rıza Metni</a>,{' '}
-                  <a href="/aydinlatma" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Aydınlatma Metni</a> ve{' '}
-                  <a href="/sorumluluk-reddi" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Sorumluluk Reddi Beyanı</a> metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
-                </p>
               </div>
             </form>
           ) : step === 3 ? (
@@ -1298,8 +1288,17 @@ export default function OzelCekiciModal({ onClose }) {
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'İlerle'}
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[#404040]">
+                  Siparişi Onayla butonuna tıkladığınızda{' '}
+                  <a href="/kvkk" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">KVKK</a>,{' '}
+                  <a href="/acik-riza" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Açık Rıza Metni</a>,{' '}
+                  <a href="/aydinlatma" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Aydınlatma Metni</a> ve{' '}
+                  <a href="/sorumluluk-reddi" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Sorumluluk Reddi Beyanı</a> metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
+                </p>
               </div>
             </form>
           ) : (

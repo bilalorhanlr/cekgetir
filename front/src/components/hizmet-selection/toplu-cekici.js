@@ -177,7 +177,7 @@ export default function TopluCekiciModal({ onClose }) {
   const [sehirler, setSehirler] = useState([])
   const [kmBasedFees, setKmBasedFees] = useState([])
   const [routes, setRoutes] = useState([])
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -996,9 +996,8 @@ export default function TopluCekiciModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
+    
+    if (step === 1) {
       // Konum kontrolleri
       if (pickupOtopark && !selectedPickupCity) {
         toast.error('Lütfen alınacak şehri seçin');
@@ -1020,50 +1019,54 @@ export default function TopluCekiciModal({ onClose }) {
         return;
       }
 
-      if (step === 1) {
-        setStep(2);
-      } else if (step === 2) {
-        // Araç kontrolleri
-        if (araclar.length === 0) {
-          toast.error('Lütfen en az bir araç ekleyin');
-          return;
-        }
-
-        if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)) {
-          toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
-          return;
-        }
-
-        setStep(3);
-      } else if (step === 3) {
-        if (!toplamFiyat) {
-          toast.error('Lütfen fiyat hesaplamasını bekleyin');
-          return;
-        }
-
-        setStep(4);
-      } else if (step === 4) {
-        // Müşteri bilgileri kontrolleri
-        if (musteriBilgileri.musteriTipi === 'kisisel') {
-          if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-            toast.error('Lütfen tüm zorunlu alanları doldurun');
-            return;
-          }
-          if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
-            toast.error('Lütfen TC Kimlik numaranızı girin');
-            return;
-          }
-        } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
-          if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
-            toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
-            return;
-          }
-        }
-
-        await createOrder();
+      setStep(2);
+    } else if (step === 2) {
+      // Araç kontrolleri
+      if (araclar.length === 0) {
+        toast.error('Lütfen en az bir araç ekleyin');
+        return;
       }
-    } finally {
-      setIsSubmitting(false);
+
+      if (araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)) {
+        toast.error('Lütfen tüm araç bilgilerini eksiksiz doldurun');
+        return;
+      }
+
+      setStep(3);
+    } else if (step === 3) {
+      if (!toplamFiyat) {
+        toast.error('Lütfen fiyat hesaplamasını bekleyin');
+        return;
+      }
+
+      setStep(4);
+    } else if (step === 4) {
+      // Müşteri bilgileri kontrolleri
+      if (musteriBilgileri.musteriTipi === 'kisisel') {
+        if (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm zorunlu alanları doldurun');
+          return;
+        }
+        if (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik) {
+          toast.error('Lütfen TC Kimlik numaranızı girin');
+          return;
+        }
+      } else if (musteriBilgileri.musteriTipi === 'kurumsal') {
+        if (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email) {
+          toast.error('Lütfen tüm firma bilgilerini eksiksiz doldurun');
+          return;
+        }
+      }
+
+      setIsSubmitting(true);
+      try {
+        await createOrder();
+      } catch (error) {
+        console.error('Sipariş oluşturma hatası:', error);
+        toast.error('Sipariş oluşturulurken bir hata oluştu: ' + (error?.response?.data?.message || error?.message || 'Bilinmeyen hata'));
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1463,10 +1466,10 @@ export default function TopluCekiciModal({ onClose }) {
 
               <button
                 type="submit"
-                disabled={isSubmitting || !pickupLocation || !deliveryLocation || (pickupOtopark && !selectedPickupCity) || (deliveryOtopark && !selectedDeliveryCity)}
+                disabled={!pickupLocation || !deliveryLocation || (pickupOtopark && !selectedPickupCity) || (deliveryOtopark && !selectedDeliveryCity)}
                 className="w-full py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
+                Devam Et
               </button>
             </form>
           ) : step === 2 ? (
@@ -1611,10 +1614,10 @@ export default function TopluCekiciModal({ onClose }) {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)}
+                  disabled={araclar.length === 0 || araclar.some(arac => !arac.marka || !arac.model || !arac.segment || !arac.yil || !arac.plaka)}
                   className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Devam Et'}
+                  Devam Et
                 </button>
               </div>
             </div>
@@ -1693,8 +1696,8 @@ export default function TopluCekiciModal({ onClose }) {
                   >
                     {pickupLocation && <Marker key="pickup" position={pickupLocation} clickable={false} />}
                     {deliveryLocation && <Marker key="delivery" position={deliveryLocation} clickable={false} />}
-                    {routes.map((route, index) => {
-                      const path = route.directions.routes[0]?.overview_path;
+                    {routes && routes.map((route, index) => {
+                      const path = route.directions?.routes?.[0]?.overview_path;
                       if (!path) return null;
                       return (
                         <Polyline
@@ -1723,10 +1726,9 @@ export default function TopluCekiciModal({ onClose }) {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Tamamla'}
+                  Devam Et
                 </button>
               </div>
             </div>
@@ -1931,13 +1933,21 @@ export default function TopluCekiciModal({ onClose }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || (musteriBilgileri.musteriTipi === 'kisisel'
-                    ? (!musteriBilgileri.ad || !musteriBilgileri.soyad || !musteriBilgileri.telefon || !musteriBilgileri.email || (musteriBilgileri.tcVatandasi && !musteriBilgileri.tcKimlik))
-                    : (!musteriBilgileri.firmaAdi || !musteriBilgileri.vergiNo || !musteriBilgileri.vergiDairesi || !musteriBilgileri.telefon || !musteriBilgileri.email))}
-                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-2.5 px-4 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Lütfen Bekleyin...' : 'İlerle'}
+                  {isSubmitting ? 'Lütfen Bekleyin...' : 'Siparişi Onayla'}
                 </button>
+              </div>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[#404040]">
+                  Siparişi Onayla butonuna tıkladığınızda{' '}
+                  <a href="/kvkk" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">KVKK</a>,{' '}
+                  <a href="/acik-riza" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Açık Rıza Metni</a>,{' '}
+                  <a href="/aydinlatma" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Aydınlatma Metni</a> ve{' '}
+                  <a href="/sorumluluk-reddi" target="_blank" className="text-yellow-500 hover:text-yellow-400 transition-colors">Sorumluluk Reddi Beyanı</a> metinlerini okuduğunuzu ve onayladığınızı taahhüt etmiş sayılırsınız.
+                </p>
               </div>
             </form>
           ) : (
