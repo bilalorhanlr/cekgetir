@@ -316,6 +316,7 @@ export default function OzelCekiciModal({ onClose }) {
 
       // Ek ücret varsa ekle
       if (extraFee > 0) {
+        
         setPrice(prevPrice => prevPrice + extraFee)
       }
 
@@ -736,7 +737,7 @@ export default function OzelCekiciModal({ onClose }) {
             type="text"
             value={aracBilgileri.plaka}
             onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value })}
-            placeholder="Plaka"
+            placeholder="34ABC123"
             maxLength={8}
             className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
           />

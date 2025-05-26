@@ -9,10 +9,15 @@ async function bootstrap() {
   
   // CORS ayarları
   app.enableCors({
-    origin: 'http://localhost:3000', // Frontend URL
+    origin: [
+      'http://172.20.10.2:3000',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    credentials: true
   });
 
   await app.listen(4000);

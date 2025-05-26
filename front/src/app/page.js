@@ -70,12 +70,12 @@ export default function Home() {
 
           <div className="relative z-10 w-full max-w-6xl mx-auto px-4 flex flex-col lg:flex-row items-center">
             {/* Sol taraf - Başlık ve Açıklama */}
-            <div className="w-full lg:w-2/3 mb-4 lg:mb-0 mt-16 lg:mt-0 pr-24">
+            <div className="w-full lg:w-2/3 mb-4 lg:mb-0 mt-16 lg:mt-0 lg:pr-24">
               <div className="text-white">
-                <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                <h1 className="text-3xl md:text-5xl text-center lg:text-left font-bold mb-6">
                 Şehirler Arası Araç Taşıma Ve Yol Yardım Hizmeti
                 </h1>
-                <p className="text-lg md:text-xl mb-8 text-gray-300">
+                <p className="text-lg md:text-xl mb-8 text-center lg:text-left text-gray-300">
                   Çekici, lastik, akü ve tüm yol yardım hizmetleriyle yanınızdayız
                 </p>
               </div>

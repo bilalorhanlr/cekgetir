@@ -349,11 +349,29 @@ export default function TopluCekiciModal({ onClose }) {
         km = await getDistanceBetween(input.pickupLocation, input.deliveryLocation);
       }
 
+      console.log('🚛 Fiyat Hesaplama Detayları:', {
+        mesafe: km,
+        alisKonumu: input.pickupLocation,
+        teslimKonumu: input.deliveryLocation,
+        otoparkAlis: input.pickupOtopark,
+        otoparkTeslim: input.deliveryOtopark,
+        sehirFiyatlandirma: input.sehirFiyatlandirma,
+        araclar: input.araclar,
+        kmBasedFees: kmBasedFees
+      });
+
       const basePrice = Number(input.sehirFiyatlandirma.basePrice) || 0;
       const kmBasedPrice = getKmBasedPrice(km, kmBasedFees);
       const totalKmPrice = km * kmBasedPrice;
 
-      let totalPrice = basePrice + totalKmPrice;
+      console.log('💰 Temel Fiyat Hesaplama:', {
+        basePrice,
+        kmBasedPrice,
+        totalKmPrice,
+        toplamKm: km
+      });
+
+      let totalPrice = basePrice + totalKmPrice; //9400
 
       for (const arac of input.araclar) {
         const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
@@ -362,17 +380,46 @@ export default function TopluCekiciModal({ onClose }) {
         const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
         const statusMultiplier = statusObj ? Number(statusObj.price) : 0;
 
+        console.log('🚗 Araç Fiyat Hesaplama:', {
+          aracId: arac.id,
+          plaka: arac.plaka,
+          segment: segmentObj?.name,
+          segmentMultiplier,
+          durum: statusObj?.name,
+          statusMultiplier
+        });
+
         const aracBasePrice = basePrice + totalKmPrice;
         const aracPrice = (aracBasePrice * segmentMultiplier) + statusMultiplier;
-        totalPrice += aracPrice;
+        totalPrice = aracPrice;
+
+        console.log('💵 Araç Toplam Fiyat:', {
+          aracId: arac.id,
+          plaka: arac.plaka,
+          aracBasePrice,
+          aracPrice,
+          araclarToplamFiyat: totalPrice
+        });
       }
 
       if (input.isNight) {
         totalPrice *= input.nightPriceMultiplier;
+        console.log('🌙 Gece Ücreti:', {
+          isNight: input.isNight,
+          nightPriceMultiplier: input.nightPriceMultiplier,
+          nightPrice: totalPrice
+        });
       }
+
+      console.log('🎯 Final Fiyat:', {
+        totalPrice,
+        araclarSayisi: input.araclar.length,
+        toplamKm: km
+      });
 
       return Math.round(totalPrice);
     } catch (error) {
+      console.error('❌ Fiyat hesaplama hatası:', error);
       throw error;
     }
   };
@@ -1336,7 +1383,7 @@ export default function TopluCekiciModal({ onClose }) {
                             type="text"
                             value={arac.plaka}
                             onChange={(e) => aracGuncelle(arac.id, 'plaka', e.target.value.toUpperCase())}
-                            placeholder="Plaka"
+                            placeholder="34ABC123"
                             maxLength={8}
                             className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                           />

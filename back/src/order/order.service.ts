@@ -33,7 +33,7 @@ export class OrderService {
     const pnr = this.generatePNR();
     console.log('Creating order with PNR:', pnr);
     console.log('Order data received:', JSON.stringify(orderData, null, 2));
-    
+    console.log('Vehicle condition:', orderData.vehicles);
     // Ana sipariş verilerini oluştur
     const order = this.orderRepository.create({
       pnrNo: pnr,
@@ -62,6 +62,7 @@ export class OrderService {
       vehicleYear: orderData.vehicles?.[0]?.yil || '',
       vehiclePlate: orderData.vehicles?.[0]?.plaka || '',
       price: orderData.price || 0,
+      vehicleCondition: orderData.vehicles?.[0]?.condition || '',
       status: 'ONAY_BEKLIYOR',
       paymentStatus: 'ODEME_BEKLIYOR',
       faultType: orderData.faultType || ''

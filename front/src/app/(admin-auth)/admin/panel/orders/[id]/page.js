@@ -14,6 +14,7 @@ export default function OrderDetailPage({ params }) {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false)
   const [carSegments, setCarSegments] = useState([])
+  const [carStatuses, setCarStatuses] = useState([])
   const orderId = use(params).id
 
   useEffect(() => {
@@ -23,12 +24,19 @@ export default function OrderDetailPage({ params }) {
   }, [orderId])
 
   useEffect(() => {
-    const fetchCarSegments = async () => {
-      const response = await api.get('api/variables/car-segments')
-      setCarSegments(response.data)
-    }
     fetchCarSegments()
+    fetchCarStatuses()
   }, [])
+
+  const fetchCarSegments = async () => {
+    const response = await api.get('api/variables/car-segments')
+    setCarSegments(response.data)
+  }
+
+  const fetchCarStatuses = async () => {
+    const response = await api.get('api/variables/car-statuses')
+    setCarStatuses(response.data)
+  }
 
   const fetchOrder = async () => {
     try {
@@ -113,14 +121,11 @@ export default function OrderDetailPage({ params }) {
             <div className="space-y-6">
               <div>
                 <div className="text-gray-400 text-sm mb-1">Arıza Türü</div>
-                <div className="text-white text-lg">{order.faultType || 'Belirtilmemiş'}</div>
+                <div className="text-white text-lg">{order.vehicleCondition}</div>
               </div>
               <div>
                 <div className="text-gray-400 text-sm mb-1">Arıza Yeri</div>
                 <div className="text-white text-lg">{order.breakdownLocation}</div>
-                {order.breakdownDescription && (
-                  <div className="text-gray-400 text-sm mt-1">{order.breakdownDescription}</div>
-                )}
               </div>
             </div>
           </div>
@@ -141,15 +146,9 @@ export default function OrderDetailPage({ params }) {
                 <div className="text-gray-400 text-sm mb-1">Bırakılacak Yer</div>
                 <div className="text-white text-lg">{order.dropoffLocation}</div>
                 {order.isDeliveryToParking && (
-                  <div className="text-yellow-500 text-sm mt-1">Otoparka Bırakılacak</div>
+                  <div className="text-yellow-500 text-sm mt-1">Otopark : {order.destinationLocation}</div>
                 )}
               </div>
-              {order.specialNotes && (
-                <div>
-                  <div className="text-gray-400 text-sm mb-1">Özel Notlar</div>
-                  <div className="text-white text-lg">{order.specialNotes}</div>
-                </div>
-              )}
             </div>
           </div>
         )
@@ -580,7 +579,7 @@ export default function OrderDetailPage({ params }) {
                           </div>
                           <div>
                             <div className="text-gray-400 text-sm mb-1">Durum</div>
-                            <div className="text-white">{vehicle.condition}</div>
+                            <div className="text-white">{carStatuses.find(status => status.id === parseInt(vehicle.condition))?.name}</div>
                           </div>
                         </div>
                       </div>
@@ -590,7 +589,7 @@ export default function OrderDetailPage({ params }) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-gray-400 text-sm mb-1">Segment</div>
-                      <div className="text-white">{order.vehicleSegment}</div>
+                      <div className="text-white">{carSegments.find(segment => segment.id === parseInt(order.vehicleSegment))?.name}</div>
                     </div>
                     <div>
                       <div className="text-gray-400 text-sm mb-1">Marka</div>
@@ -610,7 +609,7 @@ export default function OrderDetailPage({ params }) {
                     </div>
                     <div>
                       <div className="text-gray-400 text-sm mb-1">Durum</div>
-                      <div className="text-white">{order.vehicleCondition}</div>
+                      <div className="text-white">{carStatuses.find(status => status.id === parseInt(order.vehicleCondition))?.name}</div>
                     </div>
                   </div>
                 )}

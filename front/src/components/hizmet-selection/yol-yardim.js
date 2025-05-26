@@ -55,7 +55,8 @@ export default function YolYardimModal({ onClose }) {
     aracMarkalari: [],
     aracModelleri: {},
     yillar: [],
-    segmentler: []
+    segmentler: [],
+    durumlar: []
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -65,7 +66,8 @@ export default function YolYardimModal({ onClose }) {
     model: '',
     yil: '',
     plaka: '',
-    tip: ''
+    tip: '',
+    condition: ''
   })
   const [price, setPrice] = useState(null)
   const [directions, setDirections] = useState(null)
@@ -573,6 +575,10 @@ export default function YolYardimModal({ onClose }) {
 
   const handleArizaSelect = (ariza) => {
     setSelectedAriza(ariza)
+    setAracBilgileri(prev => ({
+      ...prev,
+      condition: ariza.name
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -641,7 +647,7 @@ export default function YolYardimModal({ onClose }) {
           model: aracBilgileri.model,
           yil: aracBilgileri.yil,
           plaka: aracBilgileri.plaka,
-          condition: aracBilgileri.condition
+          condition: selectedAriza?.name || selectedAriza?.title || aracBilgileri.condition
         }],
         price: price,
         customerInfo: {
@@ -863,7 +869,7 @@ export default function YolYardimModal({ onClose }) {
                           type="text"
                           value={aracBilgileri.plaka}
                           onChange={(e) => setAracBilgileri({ ...aracBilgileri, plaka: e.target.value.toUpperCase() })}
-                          placeholder="Plaka"
+                          placeholder="34ABC123"
                           maxLength={8}
                           className="w-full px-4 py-3 bg-[#141414] border border-[#404040] rounded-lg text-white placeholder-[#404040] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         />
