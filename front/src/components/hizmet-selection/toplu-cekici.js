@@ -166,6 +166,7 @@ export default function TopluCekiciModal({ onClose }) {
   const [selectedSegment, setSelectedSegment] = useState('')
   const [modelOptions, setModelOptions] = useState([])
   const [sehirFiyatlandirma, setSehirFiyatlandirma] = useState(null)
+  const [deliverySehirFiyatlandirma, setDeliverySehirFiyatlandirma] = useState(null)
   const [selectedCity, setSelectedCity] = useState('')
   const [otoparkInfo, setOtoparkInfo] = useState({ adres: '', lat: null, lng: null })
   const citySelectRef = useRef(null)
@@ -174,7 +175,8 @@ export default function TopluCekiciModal({ onClose }) {
   const [activeMapPanel, setActiveMapPanel] = useState(null)
   const [isLoadingTopluCekici, setIsLoadingTopluCekici] = useState(true)
   const [sehirler, setSehirler] = useState([])
-  const [kmBasedFees, setKmBasedFees] = useState([]);
+  const [kmBasedFees, setKmBasedFees] = useState([])
+  const [routes, setRoutes] = useState([])
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -193,6 +195,7 @@ export default function TopluCekiciModal({ onClose }) {
 
         setFiyatlandirma({
           ...data.topluCekici,
+          topluCekiciBasePrice: data.topluCekici.basePrice,
           sehirler: data.sehirler || []
         });
         setSehirler(data.sehirler || []);
@@ -342,89 +345,152 @@ export default function TopluCekiciModal({ onClose }) {
     }
   };
 
-  const calculateTotalPrice = async (input) => {
+  const calculateTotalPrice = async (input, showDebug = false) => {
     try {
-      let km = 0;
-      if (input.pickupLocation && input.deliveryLocation) {
-        km = await getDistanceBetween(input.pickupLocation, input.deliveryLocation);
+      if (showDebug) {
+        console.log('--- DEBUG GİRDİLERİ ---');
+        console.log('Alınacak Konum:', input.pickupLocation);
+        console.log('Alınacak Otopark:', input.pickupOtopark);
+        console.log('Alınacak Şehir Fiyatlandırması:', input.sehirFiyatlandirma);
+        console.log('Teslim Edilecek Konum:', input.deliveryLocation);
+        console.log('Teslim Edilecek Otopark:', input.deliveryOtopark);
+        console.log('Teslim Edilecek Şehir Fiyatlandırması:', input.deliverySehirFiyatlandirma);
+        console.log('Genel Fiyatlandırma:', input.fiyatlandirma);
+        console.log('KM Bazlı Ücretler:', input.kmBasedFees);
+        console.log('Araçlar:', input.araclar);
+        console.log('-------------------');
       }
 
-      console.log('🚛 Fiyat Hesaplama Detayları:', {
-        mesafe: km,
-        alisKonumu: input.pickupLocation,
-        teslimKonumu: input.deliveryLocation,
-        otoparkAlis: input.pickupOtopark,
-        otoparkTeslim: input.deliveryOtopark,
-        sehirFiyatlandirma: input.sehirFiyatlandirma,
-        araclar: input.araclar,
-        kmBasedFees: kmBasedFees
-      });
+      let totalPrice = 0;
+      let routes = [];
 
-      const basePrice = Number(input.sehirFiyatlandirma.basePrice) || 0;
-      const kmBasedPrice = getKmBasedPrice(km, kmBasedFees);
-      const totalKmPrice = km * kmBasedPrice;
+      // 1. Aşama: Konum -> Otopark (Alınacak şehir)
+      if (!input.pickupOtopark && input.pickupLocation && input.sehirFiyatlandirma) {
+        const pickupOtoparkLocation = {
+          lat: Number(input.sehirFiyatlandirma.otoparkLat),
+          lng: Number(input.sehirFiyatlandirma.otoparkLng)
+        };
+        const pickupToOtoparkKm = await getDistanceBetween(input.pickupLocation, pickupOtoparkLocation);
+        const pickupToOtoparkPrice = Number(input.sehirFiyatlandirma.basePrice) + (pickupToOtoparkKm * Number(input.sehirFiyatlandirma.basePricePerKm));
+        if (showDebug) {
+          console.log('\n1️⃣ Alınacak Konum -> Otopark:');
+          console.log('- Mesafe:', pickupToOtoparkKm.toFixed(2), 'km');
+          console.log('- Base Price:', Number(input.sehirFiyatlandirma.basePrice).toFixed(2), 'TL');
+          console.log('- KM Başına Ücret:', Number(input.sehirFiyatlandirma.basePricePerKm).toFixed(2), 'TL');
+          console.log('- Toplam Fiyat:', pickupToOtoparkPrice.toFixed(2), 'TL');
+        }
+        totalPrice += pickupToOtoparkPrice;
+        routes.push({
+          origin: input.pickupLocation,
+          destination: pickupOtoparkLocation,
+          color: '#FF0000'
+        });
+      } else if (showDebug) {
+        console.log('\n1️⃣ Alınacak Konum -> Otopark: Gerekli parametreler eksik!');
+      }
 
-      console.log('💰 Temel Fiyat Hesaplama:', {
-        basePrice,
-        kmBasedPrice,
-        totalKmPrice,
-        toplamKm: km
-      });
+      // 2. Aşama: Otopark -> Otopark (Toplu Çekici)
+      if (input.sehirFiyatlandirma && input.deliverySehirFiyatlandirma && input.fiyatlandirma) {
+        const pickupOtoparkLocation = {
+          lat: Number(input.sehirFiyatlandirma.otoparkLat),
+          lng: Number(input.sehirFiyatlandirma.otoparkLng)
+        };
+        const deliveryOtoparkLocation = {
+          lat: Number(input.deliverySehirFiyatlandirma.otoparkLat),
+          lng: Number(input.deliverySehirFiyatlandirma.otoparkLng)
+        };
+        const otoparkToOtoparkKm = await getDistanceBetween(pickupOtoparkLocation, deliveryOtoparkLocation);
+        const kmBasedPrice = getKmBasedPrice(otoparkToOtoparkKm, input.kmBasedFees);
+        const otoparkToOtoparkPrice = Number(input.fiyatlandirma.basePrice) + (otoparkToOtoparkKm * kmBasedPrice);
+        if (showDebug) {
+          console.log('\n2️⃣ Otopark -> Otopark (Toplu Çekici):');
+          console.log('- Mesafe:', otoparkToOtoparkKm.toFixed(2), 'km');
+          console.log('- Base Price:', Number(input.fiyatlandirma.basePrice).toFixed(2), 'TL');
+          console.log('- KM Başına Ücret:', kmBasedPrice.toFixed(2), 'TL');
+          console.log('- Toplam Fiyat:', otoparkToOtoparkPrice.toFixed(2), 'TL');
+        }
+        totalPrice += otoparkToOtoparkPrice;
+        routes.push({
+          origin: pickupOtoparkLocation,
+          destination: deliveryOtoparkLocation,
+          color: '#FFFF00'
+        });
+      } else if (showDebug) {
+        console.log('\n2️⃣ Otopark -> Otopark (Toplu Çekici): Gerekli parametreler eksik!');
+      }
 
-      let totalPrice = basePrice + totalKmPrice; //9400
+      // 3. Aşama: Otopark -> Konum (Teslim edilecek şehir)
+      if (!input.deliveryOtopark && input.deliveryLocation && input.deliverySehirFiyatlandirma) {
+        const deliveryOtoparkLocation = {
+          lat: Number(input.deliverySehirFiyatlandirma.otoparkLat),
+          lng: Number(input.deliverySehirFiyatlandirma.otoparkLng)
+        };
+        const otoparkToDeliveryKm = await getDistanceBetween(deliveryOtoparkLocation, input.deliveryLocation);
+        const otoparkToDeliveryPrice = Number(input.deliverySehirFiyatlandirma.basePrice) + (otoparkToDeliveryKm * Number(input.deliverySehirFiyatlandirma.basePricePerKm));
+        if (showDebug) {
+          console.log('\n3️⃣ Otopark -> Teslim Edilecek Konum:');
+          console.log('- Mesafe:', otoparkToDeliveryKm.toFixed(2), 'km');
+          console.log('- Base Price:', Number(input.deliverySehirFiyatlandirma.basePrice).toFixed(2), 'TL');
+          console.log('- KM Başına Ücret:', Number(input.deliverySehirFiyatlandirma.basePricePerKm).toFixed(2), 'TL');
+          console.log('- Toplam Fiyat:', otoparkToDeliveryPrice.toFixed(2), 'TL');
+        }
+        totalPrice += otoparkToDeliveryPrice;
+        routes.push({
+          origin: deliveryOtoparkLocation,
+          destination: input.deliveryLocation,
+          color: '#00FF00'
+        });
+      } else if (showDebug) {
+        console.log('\n3️⃣ Otopark -> Teslim Edilecek Konum: Gerekli parametreler eksik!');
+      }
 
+      // 4. Aşama: Araç bazlı hesaplama
+      if (showDebug) {
+        console.log('\n4️⃣ Araç Detayları:');
+      }
       for (const arac of input.araclar) {
+        if (showDebug) {
+          console.log(`\n🚗 Araç ${input.araclar.indexOf(arac) + 1}:`);
+          console.log('- Marka:', arac.marka);
+          console.log('- Model:', arac.model);
+          console.log('- Segment:', arac.segment);
+          console.log('- Durum:', arac.durum);
+        }
         const segmentObj = vehicleData.segmentler.find(seg => String(seg.id) === String(arac.segment));
         const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
-        
         const statusObj = vehicleData.durumlar.find(st => String(st.id) === String(arac.durum));
         const statusMultiplier = statusObj ? Number(statusObj.price) : 0;
-
-        console.log('🚗 Araç Fiyat Hesaplama:', {
-          aracId: arac.id,
-          plaka: arac.plaka,
-          segment: segmentObj?.name,
-          segmentMultiplier,
-          durum: statusObj?.name,
-          statusMultiplier
-        });
-
-        const aracBasePrice = basePrice + totalKmPrice;
-        const aracPrice = (aracBasePrice * segmentMultiplier) + statusMultiplier;
+        if (showDebug) {
+          console.log('- Segment Çarpanı:', segmentMultiplier.toFixed(2));
+          console.log('- Durum Ücreti:', statusMultiplier.toFixed(2), 'TL');
+        }
+        const aracPrice = (totalPrice * segmentMultiplier) + statusMultiplier;
+        if (showDebug) {
+          console.log('- Araç Toplam Fiyatı:', aracPrice.toFixed(2), 'TL');
+        }
         totalPrice = aracPrice;
-
-        console.log('💵 Araç Toplam Fiyat:', {
-          aracId: arac.id,
-          plaka: arac.plaka,
-          aracBasePrice,
-          aracPrice,
-          araclarToplamFiyat: totalPrice
-        });
       }
 
-      if (input.isNight) {
-        totalPrice *= input.nightPriceMultiplier;
-        console.log('🌙 Gece Ücreti:', {
-          isNight: input.isNight,
-          nightPriceMultiplier: input.nightPriceMultiplier,
-          nightPrice: totalPrice
-        });
+      // 5. Aşama: KDV Hesaplama
+      const kdvOrani = 0.20; // %20 KDV
+      const kdvTutari = totalPrice * kdvOrani;
+      totalPrice += kdvTutari;
+
+      if (showDebug) {
+        console.log('\n5️⃣ KDV Hesaplama:');
+        console.log('- KDV Oranı:', (kdvOrani * 100).toFixed(0) + '%');
+        console.log('- KDV Tutarı:', kdvTutari.toFixed(2), 'TL');
+        console.log('\n💰 Final Fiyat (KDV Dahil):', totalPrice.toFixed(2), 'TL');
       }
 
-      console.log('🎯 Final Fiyat:', {
-        totalPrice,
-        araclarSayisi: input.araclar.length,
-        toplamKm: km
-      });
-
-      return Math.round(totalPrice);
+      return { totalPrice: Math.round(totalPrice), routes };
     } catch (error) {
-      console.error('❌ Fiyat hesaplama hatası:', error);
+      console.error('Fiyat hesaplama hatası:', error);
       throw error;
     }
   };
 
-  // Fiyat hesaplama useEffect'i
+  // Fiyat hesaplama useEffect'ini güncelle
   useEffect(() => {
     const calculatePrice = async () => {
       if (
@@ -434,21 +500,24 @@ export default function TopluCekiciModal({ onClose }) {
         sehirFiyatlandirma &&
         fiyatlandirma
       ) {
-        const price = await calculateTotalPrice({
+        const result = await calculateTotalPrice({
           pickupLocation,
           deliveryLocation,
           pickupOtopark,
           deliveryOtopark,
           araclar,
           sehirFiyatlandirma,
-          fiyatlandirma
+          deliverySehirFiyatlandirma,
+          fiyatlandirma,
+          kmBasedFees
         });
-        setToplamFiyat(price);
+        setToplamFiyat(result.totalPrice);
+        setRoutes(result.routes);
       }
     };
 
     calculatePrice();
-  }, [pickupLocation, deliveryLocation, araclar, sehirFiyatlandirma, fiyatlandirma, pickupOtopark, deliveryOtopark]);
+  }, [pickupLocation, deliveryLocation, araclar, sehirFiyatlandirma, deliverySehirFiyatlandirma, fiyatlandirma, pickupOtopark, deliveryOtopark, kmBasedFees]);
 
   // Debounce edilmiş değerler
   const debouncedPickupLocation = useDebounce(pickupLocation, 500);
@@ -465,11 +534,11 @@ export default function TopluCekiciModal({ onClose }) {
         pickupOtopark,
         deliveryOtopark,
         araclar,
-        sehirFiyatlandirma,
-        fiyatlandirma
+        fiyatlandirma,
+        sehirFiyatlandirma
       });
     }
-  }, [debouncedPickupLocation, debouncedDeliveryLocation, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, sehirFiyatlandirma, fiyatlandirma]);
+  }, [debouncedPickupLocation, debouncedDeliveryLocation, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, fiyatlandirma, sehirFiyatlandirma]);
 
   // Araç listesi değiştiğinde fiyat hesapla
   useEffect(() => {
@@ -480,11 +549,11 @@ export default function TopluCekiciModal({ onClose }) {
         pickupOtopark,
         deliveryOtopark,
         araclar,
-        sehirFiyatlandirma,
-        fiyatlandirma
+        fiyatlandirma,
+        sehirFiyatlandirma
       });
     }
-  }, [debouncedAraclar, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, sehirFiyatlandirma, fiyatlandirma]);
+  }, [debouncedAraclar, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, fiyatlandirma, sehirFiyatlandirma]);
 
   // Rota bilgisi güncellendiğinde fiyat hesapla
   useEffect(() => {
@@ -495,11 +564,11 @@ export default function TopluCekiciModal({ onClose }) {
         pickupOtopark,
         deliveryOtopark,
         araclar,
-        sehirFiyatlandirma,
-        fiyatlandirma
+        fiyatlandirma,
+        sehirFiyatlandirma
       });
     }
-  }, [debouncedRouteInfo, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, sehirFiyatlandirma, fiyatlandirma]);
+  }, [debouncedRouteInfo, calculateTotalPrice, pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, fiyatlandirma, sehirFiyatlandirma]);
 
   // Şehir seçildiğinde fiyatlandırma ve otopark bilgisi çek
   useEffect(() => {
@@ -550,21 +619,23 @@ export default function TopluCekiciModal({ onClose }) {
 
   // Remove duplicate useEffect hooks and consolidate them
   useEffect(() => {
-    const handleLocationUpdate = (isPickup) => {
+    const handleLocationUpdate = async (isPickup) => {
       const city = isPickup ? selectedPickupCity : selectedDeliveryCity;
       const isOtopark = isPickup ? pickupOtopark : deliveryOtopark;
       const setLocation = isPickup ? setPickupLocation : setDeliveryLocation;
       const setSearchValue = isPickup ? setPickupSearchValue : setDeliverySearchValue;
+      const setSehirFiyat = isPickup ? setSehirFiyatlandirma : setDeliverySehirFiyatlandirma;
 
       if (isOtopark && city && fiyatlandirma?.sehirler) {
-        const sehir = fiyatlandirma.sehirler.find(s => s.id === city);
+        const sehir = fiyatlandirma.sehirler.find(s => s.sehirAdi === city);
         if (sehir) {
-          setSearchValue(sehir.adres);
+          setSearchValue(sehir.otoparkAdres);
           setLocation({
-            lat: sehir.lat,
-            lng: sehir.lng,
-            address: sehir.adres
+            lat: Number(sehir.otoparkLat),
+            lng: Number(sehir.otoparkLng),
+            address: sehir.otoparkAdres
           });
+          setSehirFiyat(sehir);
         }
       }
     };
@@ -572,6 +643,55 @@ export default function TopluCekiciModal({ onClose }) {
     handleLocationUpdate(true); // Handle pickup location
     handleLocationUpdate(false); // Handle delivery location
   }, [pickupOtopark, deliveryOtopark, selectedPickupCity, selectedDeliveryCity, fiyatlandirma]);
+
+  // Add new useEffect for handling city detection
+  useEffect(() => {
+    const detectCityAndSetPricing = async (location, isPickup) => {
+      if (!location || !window.google) return;
+
+      try {
+        const geocoder = new window.google.maps.Geocoder();
+        const result = await new Promise((resolve, reject) => {
+          geocoder.geocode({ location: { lat: location.lat, lng: location.lng } }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+              resolve(results[0]);
+            } else {
+              reject(new Error('Geocoding failed'));
+            }
+          });
+        });
+
+        // Find the city component
+        const cityComponent = result.address_components.find(component => 
+          component.types.includes('administrative_area_level_1')
+        );
+
+        if (cityComponent && fiyatlandirma?.sehirler) {
+          const cityName = cityComponent.long_name;
+          const sehir = fiyatlandirma.sehirler.find(s => s.sehirAdi === cityName);
+          
+          if (sehir) {
+            if (isPickup) {
+              setSelectedPickupCity(cityName);
+              setSehirFiyatlandirma(sehir);
+            } else {
+              setSelectedDeliveryCity(cityName);
+              setDeliverySehirFiyatlandirma(sehir);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('City detection error:', error);
+      }
+    };
+
+    if (pickupLocation) {
+      detectCityAndSetPricing(pickupLocation, true);
+    }
+    if (deliveryLocation) {
+      detectCityAndSetPricing(deliveryLocation, false);
+    }
+  }, [pickupLocation, deliveryLocation, fiyatlandirma]);
 
   // Improve geolocation error handling
   const handleCurrentLocation = async (target) => {
@@ -1473,6 +1593,27 @@ export default function TopluCekiciModal({ onClose }) {
               <div className="bg-[#141414] rounded-lg p-4 border border-[#404040]">
                 <h3 className="text-lg font-semibold text-white mb-4">Fiyat Teklifi</h3>
                 <FiyatDetaylari routeInfo={routeInfo} toplamFiyat={toplamFiyat} />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const result = await calculateTotalPrice({
+                      pickupLocation,
+                      deliveryLocation,
+                      pickupOtopark,
+                      deliveryOtopark,
+                      araclar,
+                      fiyatlandirma,
+                      sehirFiyatlandirma,
+                      deliverySehirFiyatlandirma,
+                      kmBasedFees
+                    }, true);
+                    setToplamFiyat(result.totalPrice);
+                    setRoutes(result.routes);
+                  }}
+                  className="mt-4 w-full py-2 px-4 bg-[#202020] text-[#404040] font-medium rounded-lg hover:bg-[#303030] hover:text-white transition-colors"
+                >
+                  Fiyat Hesaplama Detaylarını Göster
+                </button>
               </div>
 
               {isLoaded && (
@@ -1492,20 +1633,20 @@ export default function TopluCekiciModal({ onClose }) {
                   >
                     {pickupLocation && <Marker key="pickup" position={pickupLocation} clickable={false} />}
                     {deliveryLocation && <Marker key="delivery" position={deliveryLocation} clickable={false} />}
-                    {directions && (
+                    {routes.map((route, index) => (
                       <DirectionsRenderer
-                        key="directions"
-                        directions={directions}
+                        key={`route-${index}`}
+                        directions={route.directions}
                         options={{
                           suppressMarkers: true,
                           polylineOptions: {
-                            strokeColor: '#EAB308',
+                            strokeColor: route.color,
                             strokeWeight: 5,
                             strokeOpacity: 0.8
                           }
                         }}
                       />
-                    )}
+                    ))}
                   </GoogleMap>
                 </div>
               )}
