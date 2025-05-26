@@ -72,12 +72,14 @@ const isValidCoordinate = (value) => {
   return typeof value === 'number' && !isNaN(value) && isFinite(value);
 };
 
-const setLocationWithValidation = (setter, location) => {
-  if (location && isValidCoordinate(location.lat) && isValidCoordinate(location.lng)) {
-    setter(location);
-  } else {
-    console.error('Invalid coordinates:', location);
-  }
+// Yardımcı fonksiyon: konum objesini normalize et
+const normalizeLocation = (loc) => {
+  if (!loc) return null;
+  return {
+    lat: Number(loc.lat),
+    lng: Number(loc.lng),
+    address: loc.address || ''
+  };
 };
 
 // Debounce fonksiyonu ekle
@@ -257,7 +259,6 @@ export default function TopluCekiciModal({ onClose }) {
   // Rota hesaplama fonksiyonu
   const calculateRoute = useCallback(async () => {
     if (!pickupLocation || !deliveryLocation || !window.google) return;
-
     try {
       const directionsService = new window.google.maps.DirectionsService();
       let routes = [];
@@ -338,7 +339,12 @@ export default function TopluCekiciModal({ onClose }) {
       // Rotaları güncelle
       setRoutes(routes);
     } catch (error) {
-      console.error('Rota hesaplama hatası:', error);
+      if (error.message && error.message.includes('ZERO_RESULTS')) {
+        toast.error('Seçilen iki nokta arasında yol bulunamadı. Lütfen farklı bir konum seçin.');
+        console.error('Rota bulunamadı:', { pickupLocation, deliveryLocation });
+      } else {
+        console.error('Rota hesaplama hatası:', error, { pickupLocation, deliveryLocation });
+      }
     }
   }, [pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, sehirFiyatlandirma, deliverySehirFiyatlandirma]);
 
@@ -367,35 +373,50 @@ export default function TopluCekiciModal({ onClose }) {
     return Math.round((distance * cityFee.basePricePerKm) + cityFee.basePrice);
   };
 
+  // setLocationWithValidation fonksiyonunu güncelle
+  const setLocationWithValidation = (setter, location) => {
+    const loc = normalizeLocation(location);
+    if (loc && isValidCoordinate(loc.lat) && isValidCoordinate(loc.lng)) {
+      setter(loc);
+    } else {
+      console.error('Invalid coordinates:', location);
+    }
+  };
+
+  // Rota ve mesafe hesaplamadan önce origin/destination'ı normalizeLocation ile kullan
   const getDistanceBetween = async (origin, destination) => {
     try {
-      // Koordinatları parse et
-      const originLat = parseCoordinate(origin.lat);
-      const originLng = parseCoordinate(origin.lng);
-      const destLat = parseCoordinate(destination.lat);
-      const destLng = parseCoordinate(destination.lng);
-
+      const o = normalizeLocation(origin);
+      const d = normalizeLocation(destination);
       if (
-        isNaN(originLat) || isNaN(originLng) ||
-        isNaN(destLat) || isNaN(destLng)
+        isNaN(o.lat) || isNaN(o.lng) ||
+        isNaN(d.lat) || isNaN(d.lng)
       ) {
         console.error('Invalid coordinates:', { origin, destination });
         return 0;
       }
-
       const directionsService = new window.google.maps.DirectionsService();
-      const result = await directionsService.route({
-        origin: { lat: originLat, lng: originLng },
-        destination: { lat: destLat, lng: destLng },
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      });
-
-      if (!result.routes?.[0]?.legs?.[0]) {
-        console.error('Invalid route result:', result);
-        return 0;
+      try {
+        const result = await directionsService.route({
+          origin: { lat: o.lat, lng: o.lng },
+          destination: { lat: d.lat, lng: d.lng },
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        });
+        if (!result.routes?.[0]?.legs?.[0]) {
+          console.error('Invalid route result:', result);
+          return 0;
+        }
+        return result.routes[0].legs[0].distance.value / 1000; // km
+      } catch (error) {
+        if (error.message && error.message.includes('ZERO_RESULTS')) {
+          toast.error('Seçilen iki nokta arasında yol bulunamadı. Lütfen farklı bir konum seçin.');
+          console.error('Rota bulunamadı:', { origin: o, destination: d });
+          return 0;
+        } else {
+          console.error('Mesafe hesaplama hatası:', error, { origin: o, destination: d });
+          return 0;
+        }
       }
-
-      return result.routes[0].legs[0].distance.value / 1000; // km
     } catch (error) {
       console.error('Mesafe hesaplama hatası:', error);
       return 0;
@@ -636,11 +657,11 @@ export default function TopluCekiciModal({ onClose }) {
           const response = await api.get(`/api/variables/toplu-cekici/sehirler/${normalizedSehir}`);
           setSehirFiyatlandirma(response.data);
           if (pickupOtopark) {
-            setLocationWithValidation(setPickupLocation, {
-              lat: Number(response.data.otoparkLat),
-              lng: Number(response.data.otoparkLng),
+            setLocationWithValidation(setPickupLocation, normalizeLocation({
+              lat: response.data.otoparkLat,
+              lng: response.data.otoparkLng,
               address: response.data.otoparkAdres
-            });
+            }));
             setPickupSearchValue(response.data.otoparkAdres);
           }
         } catch (err) {
@@ -659,11 +680,11 @@ export default function TopluCekiciModal({ onClose }) {
           const normalizedSehir = normalizeSehirAdi(selectedDeliveryCity);
           const response = await api.get(`/api/variables/toplu-cekici/sehirler/${normalizedSehir}`);
           if (deliveryOtopark) {
-            setLocationWithValidation(setDeliveryLocation, {
-              lat: Number(response.data.otoparkLat),
-              lng: Number(response.data.otoparkLng),
+            setLocationWithValidation(setDeliveryLocation, normalizeLocation({
+              lat: response.data.otoparkLat,
+              lng: response.data.otoparkLng,
               address: response.data.otoparkAdres
-            });
+            }));
             setDeliverySearchValue(response.data.otoparkAdres);
           }
         } catch (err) {
@@ -791,7 +812,7 @@ export default function TopluCekiciModal({ onClose }) {
         const position = await getPosition(true);
         const { latitude, longitude } = position.coords;
         const address = await getAddressFromLatLng(latitude, longitude);
-        const newLocation = { lat: latitude, lng: longitude, address };
+        const newLocation = normalizeLocation({ lat: latitude, lng: longitude, address });
         
         if (target === 'pickup') {
           setPickupLocation(newLocation);
@@ -811,7 +832,7 @@ export default function TopluCekiciModal({ onClose }) {
             const lowAccuracyPosition = await getPosition(false);
             const { latitude, longitude } = lowAccuracyPosition.coords;
             const address = await getAddressFromLatLng(latitude, longitude);
-            const newLocation = { lat: latitude, lng: longitude, address };
+            const newLocation = normalizeLocation({ lat: latitude, lng: longitude, address });
 
             if (target === 'pickup') {
               setPickupLocation(newLocation);
@@ -921,19 +942,18 @@ export default function TopluCekiciModal({ onClose }) {
     }
   };
 
+  // Autocomplete ve harita tıklama için konum atamalarını güncelle
   const handlePredictionSelect = async (prediction) => {
     if (!window.google) return;
-
     const geocoder = new window.google.maps.Geocoder();
     try {
       const result = await geocoder.geocode({ placeId: prediction.place_id });
       if (result.results[0]) {
-        const location = {
+        const location = normalizeLocation({
           lat: result.results[0].geometry.location.lat(),
           lng: result.results[0].geometry.location.lng(),
           address: result.results[0].formatted_address
-        };
-
+        });
         if (activeLocation === 'pickup') {
           setPickupLocation(location);
           setPickupSearchValue(location.address);
@@ -1157,10 +1177,10 @@ export default function TopluCekiciModal({ onClose }) {
   };
 
   const handleMapClick = async (e) => {
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
+    const lat = Number(e.latLng.lat());
+    const lng = Number(e.latLng.lng());
     const address = await getAddressFromLatLng(lat, lng);
-    const newLocation = { lat, lng, address };
+    const newLocation = normalizeLocation({ lat, lng, address });
 
     // Google Maps Geocoder ile şehir bilgisini al
     const geocoder = new window.google.maps.Geocoder();
@@ -1248,6 +1268,39 @@ export default function TopluCekiciModal({ onClose }) {
       setActiveMapPanel('route');
     }
   }, [step, pickupLocation, deliveryLocation]);
+
+  // Fiyat hesaplama fonksiyonu
+  const fiyatHesapla = useCallback(async (showDebug = false) => {
+    if (
+      !pickupLocation ||
+      !deliveryLocation ||
+      araclar.length === 0 ||
+      !sehirFiyatlandirma ||
+      !fiyatlandirma
+    ) {
+      setToplamFiyat(0);
+      return 0;
+    }
+    const result = await calculateTotalPrice({
+      pickupLocation,
+      deliveryLocation,
+      pickupOtopark,
+      deliveryOtopark,
+      araclar,
+      sehirFiyatlandirma,
+      deliverySehirFiyatlandirma,
+      fiyatlandirma,
+      kmBasedFees
+    }, showDebug);
+    setToplamFiyat(result.totalPrice);
+    setRoutes(result.routes);
+    return result.totalPrice;
+  }, [pickupLocation, deliveryLocation, pickupOtopark, deliveryOtopark, araclar, sehirFiyatlandirma, deliverySehirFiyatlandirma, fiyatlandirma, kmBasedFees, calculateTotalPrice]);
+
+  // Fiyat hesaplamayı useEffect ile tetikle
+  useEffect(() => {
+    fiyatHesapla();
+  }, [pickupLocation, deliveryLocation, araclar, sehirFiyatlandirma, deliverySehirFiyatlandirma, fiyatlandirma, pickupOtopark, deliveryOtopark, kmBasedFees, fiyatHesapla]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-[2px]">

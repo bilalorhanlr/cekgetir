@@ -76,9 +76,10 @@ export default function YolYardimModal({ onClose }) {
   const [location, setLocation] = useState(null)
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [predictions, setPredictions] = useState([])
-  const [autocompleteService, setAutocompleteService] = useState(null)
+  const autocompleteService = useRef(null)
   const mapRef = useRef(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [locationSearchValue, setLocationSearchValue] = useState('')
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -87,7 +88,7 @@ export default function YolYardimModal({ onClose }) {
 
   useEffect(() => {
     if (isLoaded && window.google) {
-      setAutocompleteService(new window.google.maps.places.AutocompleteService())
+      autocompleteService.current = new window.google.maps.places.AutocompleteService()
     }
   }, [isLoaded])
 
@@ -95,32 +96,25 @@ export default function YolYardimModal({ onClose }) {
   const isNightTime = currentHour >= 22 || currentHour < 8;
 
   // Fiyat hesaplama fonksiyonu
-  const calculatePrice = useCallback(() => {
-    // Gerekli kontroller
+  const fiyatHesapla = useCallback(() => {
     if (!location || !aracBilgileri.tip || !selectedAriza || !routeInfo) {
       setPrice(0);
-      return;
+      return 0;
     }
-
     // Temel değerler
     const basePrice = Number(fiyatlandirma?.basePrice) || 0;
     const basePricePerKm = Number(fiyatlandirma?.basePricePerKm) || 0;
     const distance = routeInfo?.distance || 0;
     const nightPrice = Number(fiyatlandirma?.nightPrice) || 1.5;
-
     // Segment bilgileri
     const segmentObj = fiyatlandirma?.segmentler?.find(seg => String(seg.id) === String(aracBilgileri.tip));
     const segmentMultiplier = segmentObj ? Number(segmentObj.price) : 1;
-
     // Arıza ücreti
     const arizaFiyat = fiyatlandirma?.arizaTipleri?.[selectedAriza.id]?.price || 0;
-
     // Ara toplam hesaplama (arıza ücreti toplama olarak ekleniyor)
     const baseTotal = basePrice + (distance * basePricePerKm) + arizaFiyat;
-
     // Segment çarpanı uygulaması
     const segmentTotal = baseTotal * segmentMultiplier;
-
     // Gece ücreti kontrolü
     const finalPrice = isNightTime ? segmentTotal * nightPrice : segmentTotal;
 
@@ -138,7 +132,8 @@ export default function YolYardimModal({ onClose }) {
     });
 
     setPrice(Math.round(finalPrice));
-  }, [fiyatlandirma, location, aracBilgileri.tip, selectedAriza, routeInfo]);
+    return Math.round(finalPrice);
+  }, [fiyatlandirma, location, aracBilgileri.tip, selectedAriza, routeInfo, isNightTime]);
 
   // Fiyat detaylarını göster
   const renderPriceDetails = () => {
@@ -262,19 +257,17 @@ export default function YolYardimModal({ onClose }) {
           duration: step.duration.text
         }))
       });
-      calculatePrice();
+      fiyatHesapla();
     } catch (error) {
       console.error('Rota hesaplama hatası:', error);
       setError('Rota hesaplanırken bir hata oluştu. Lütfen tekrar deneyin.');
     }
-  }, [fiyatlandirma, calculatePrice]);
+  }, [fiyatlandirma, fiyatHesapla]);
 
-  // Arıza seçildiğinde fiyat hesaplama
+  // Fiyat hesaplamayı useEffect ile tetikle
   useEffect(() => {
-    if (selectedAriza && location && routeInfo) {
-      calculatePrice();
-    }
-  }, [selectedAriza, location, routeInfo, calculatePrice]);
+    fiyatHesapla();
+  }, [location, aracBilgileri.tip, selectedAriza, routeInfo, fiyatHesapla]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -348,16 +341,16 @@ export default function YolYardimModal({ onClose }) {
   // Konumlar değiştiğinde fiyat hesapla
   useEffect(() => {
     if (pickupLocation && deliveryLocation) {
-      calculatePrice();
+      calculateRoute(deliveryLocation);
     }
-  }, [pickupLocation, deliveryLocation, routeInfo, calculatePrice]);
+  }, [pickupLocation, deliveryLocation, routeInfo, calculateRoute]);
 
   // Araç listesi değiştiğinde fiyat hesapla
   useEffect(() => {
     if (araclar.length > 0) {
-      calculatePrice();
+      calculateRoute(deliveryLocation);
     }
-  }, [araclar, routeInfo, calculatePrice]);
+  }, [araclar, routeInfo, calculateRoute, deliveryLocation]);
 
   // İstanbul sınırları kontrolü
   const isWithinIstanbul = (lat, lng) => {
@@ -386,14 +379,13 @@ export default function YolYardimModal({ onClose }) {
     })
   }
 
-  // Input değişikliğini handle et
   const handleInputChange = async (e) => {
     const value = e.target.value
-    setSearchValue(value)
+    setLocationSearchValue(value)
     
-    if (value.length > 2 && autocompleteService) {
+    if (value.length > 2 && autocompleteService.current) {
       try {
-        const response = await autocompleteService.getPlacePredictions({
+        const response = await autocompleteService.current.getPlacePredictions({
           input: value,
           componentRestrictions: { country: 'tr' },
           types: ['address'],
@@ -413,171 +405,105 @@ export default function YolYardimModal({ onClose }) {
     }
   }
 
-  // Öneri seçildiğinde
   const handlePredictionSelect = async (prediction) => {
-    if (window.google) {
-      const geocoder = new window.google.maps.Geocoder()
-      try {
-        const result = await geocoder.geocode({ placeId: prediction.place_id })
-        if (result.results[0]) {
-          const place = result.results[0]
-          const lat = place.geometry.location.lat()
-          const lng = place.geometry.location.lng()
+    if (!window.google) return
 
-          // İstanbul sınırları kontrolü
-          if (!isWithinIstanbul(lat, lng)) {
-            toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.');
-            return;
-          }
+    const geocoder = new window.google.maps.Geocoder()
+    try {
+      const result = await geocoder.geocode({ placeId: prediction.place_id })
+      if (result.results[0]) {
+        const place = result.results[0]
+        const lat = place.geometry.location.lat()
+        const lng = place.geometry.location.lng()
 
-          const newLocation = {
-            lat,
-            lng,
-            address: place.formatted_address
-          }
-          
-          setLocation(newLocation)
-          setSearchValue(place.formatted_address)
-          calculateRoute(newLocation)
-          setShowAutocomplete(false)
-          setPredictions([])
+        // İstanbul sınırları kontrolü
+        if (!isWithinIstanbul(lat, lng)) {
+          toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.')
+          return
         }
-      } catch (error) {
-        console.error('Geocoding error:', error)
+
+        const newLocation = {
+          lat,
+          lng,
+          address: place.formatted_address
+        }
+        
+        setLocation(newLocation)
+        setLocationSearchValue(place.formatted_address)
+        calculateRoute(newLocation)
+        setShowAutocomplete(false)
+        setPredictions([])
       }
+    } catch (error) {
+      console.error('Geocoding error:', error)
     }
   }
 
-  // Haritaya tıklayınca konum seçimi
   const handleMapClick = async (e) => {
-    const lat = e.latLng.lat()
-    const lng = e.latLng.lng()
-    
-    // İstanbul sınırları kontrolü
-    if (!isWithinIstanbul(lat, lng)) {
-      toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.');
-      return;
-    }
-    
-    const address = await getAddressFromLatLng(lat, lng)
-    
-    const newLocation = { lat, lng, address }
-    
-    setLocation(newLocation)
-    setSearchValue(address)
-    setShowMap(null)
-    calculateRoute(newLocation)
-  }
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const address = await getAddressFromLatLng(lat, lng);
+    const newLocation = { lat, lng, address };
+    setLocation(newLocation);
+    setLocationSearchValue(address);
+  };
 
-  // Konumumu kullan
-  const handleCurrentLocation = useCallback(() => {
+  const handleCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      toast.error('Tarayıcınız konum özelliğini desteklemiyor.Lütfen haritadan seçiniz.');
+      toast.error('Tarayıcınız konum özelliğini desteklemiyor.');
       return;
     }
 
-    // Önce izinleri kontrol et
-    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      
       if (permissionStatus.state === 'denied') {
         toast.error('Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.');
         return;
       }
 
-      // Konum alma işlemini başlat
       const loadingToast = toast.loading('Konumunuz alınıyor...', { id: 'location' });
       
-      // Konum alma seçenekleri
-      const options = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      };
-
-      // Önce yüksek hassasiyetle deneyelim
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-
-            // İstanbul sınırları kontrolü
-            if (!isWithinIstanbul(latitude, longitude)) {
-              toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.', { id: 'location' });
-              return;
-            }
-
-            const address = await getAddressFromLatLng(latitude, longitude);
-            const newLocation = { lat: latitude, lng: longitude, address };
-            
-            setLocation(newLocation);
-            setSearchValue(address);
-            setShowMap(null);
-            calculateRoute(newLocation);
-            
-            toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
-          } catch (error) {
-            console.error('Address lookup error:', error);
-            toast.error('Adres bilgisi alınamadı. Lütfen manuel olarak girin.', { id: 'location' });
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
           }
-        },
-        async (error) => {
-          console.error('Geolocation error:', error);
-          
-          // İlk deneme başarısız olursa, düşük hassasiyetle tekrar deneyelim
-          if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
-            try {
-              const lowAccuracyPosition = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(
-                  resolve,
-                  reject,
-                  { ...options, enableHighAccuracy: false }
-                );
-              });
+        );
+      });
 
-              const { latitude, longitude } = lowAccuracyPosition.coords;
-
-              // İstanbul sınırları kontrolü
-              if (!isWithinIstanbul(latitude, longitude)) {
-                toast.error('Yol yardım hizmeti sadece İstanbul içinde geçerlidir.', { id: 'location' });
-                return;
-              }
-
-              const address = await getAddressFromLatLng(latitude, longitude);
-              const newLocation = { lat: latitude, lng: longitude, address };
-              
-              setLocation(newLocation);
-              setSearchValue(address);
-              setShowMap(null);
-              calculateRoute(newLocation);
-              
-              toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
-              return;
-            } catch (retryError) {
-              console.error('Retry geolocation error:', retryError);
-            }
-          }
-
-          let errorMessage = 'Konum alınamadı.';
-          
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
-              break;
-            case error.TIMEOUT:
-              errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
-              break;
-            default:
-              errorMessage = 'Konum alınamadı. Lütfen manuel olarak girin.';
-          }
-          
-          toast.error(errorMessage, { id: 'location' });
-        },
-        options
-      );
-    });
-  }, [calculateRoute, getAddressFromLatLng]);
+      const { latitude, longitude } = position.coords;
+      const address = await getAddressFromLatLng(latitude, longitude);
+      const newLocation = { lat: latitude, lng: longitude, address };
+      
+      setLocation(newLocation);
+      setLocationSearchValue(address);
+      setShowMap(null);
+      
+      toast.success('Konumunuz başarıyla alındı.', { id: 'location' });
+    } catch (error) {
+      console.error('Geolocation error:', error);
+      let errorMessage = 'Konum alınamadı.';
+      
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Konum izni reddedildi. Lütfen tarayıcı ayarlarından konum iznini etkinleştirin.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Konum bilgisi alınamadı. Lütfen konum servislerinizin açık olduğundan emin olun ve tekrar deneyin.';
+          break;
+        case error.TIMEOUT:
+          errorMessage = 'Konum alma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.';
+          break;
+      }
+      
+      toast.error(errorMessage, { id: 'location' });
+    }
+  };
 
   const handleArizaSelect = (ariza) => {
     setSelectedAriza(ariza)
@@ -595,13 +521,12 @@ export default function YolYardimModal({ onClose }) {
       if (step === 1) {
         // Konum kontrolü
         if (!location) {
-          toast.error('Lütfen konum seçin');
           return;
         }
 
         // Arıza kontrolü
         if (!selectedAriza) {
-          toast.error('Lütfen arıza türünü seçin');
+          toast.error('Lütfen tüm araç bilgilerini doldurun');
           return;
         }
 
@@ -736,11 +661,12 @@ export default function YolYardimModal({ onClose }) {
                         <div className="relative">
                           <input
                             type="text"
-                            value={searchValue}
+                            id="location-input"
+                            value={locationSearchValue}
                             onChange={handleInputChange}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                e.preventDefault();
+                                e.preventDefault()
                               }
                             }}
                             placeholder="Adres girin veya haritadan seçin"
